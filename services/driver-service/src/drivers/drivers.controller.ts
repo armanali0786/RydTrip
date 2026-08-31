@@ -26,6 +26,13 @@ export class DriversController {
     return this.driversService.findById(id);
   }
 
+  // Public, PII-free lookup — lets an unauthenticated rider's fare estimate
+  // show a real nearby driver's vehicle type without exposing name/phone/email.
+  @Get(':id/vehicle')
+  async findVehicleType(@Param('id') id: string) {
+    return this.driversService.findVehicleType(id);
+  }
+
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateDriverStatusDto) {
     return this.driversService.updateStatus(id, dto.status);

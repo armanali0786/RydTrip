@@ -25,6 +25,12 @@ export interface RegisterInput {
   email: string;
   password: string;
   vehicleType?: string;
+  // Driver-only KYC fields (see docs on create-driver.dto.ts / driverDocuments.ts).
+  city?: string;
+  licenseNumber?: string;
+  vehicleRegistrationNumber?: string;
+  insurancePolicyNumber?: string;
+  permitNumber?: string;
 }
 
 interface AuthState {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Car, Loader2, ArrowRight } from 'lucide-react';
+import { Car, Loader2, ArrowRight, CheckCircle2, Circle } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
+import { getRequiredDocuments, SUPPORTED_CITIES } from '../utils/driverDocuments';
 
 const DRIVER_VEHICLE_TYPES = ['SEDAN', 'SUV', 'HATCHBACK', 'AUTO', 'BIKE'] as const;
 
@@ -20,6 +21,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [vehicleType, setVehicleType] = useState<string>(DRIVER_VEHICLE_TYPES[0]);
+  const [city, setCity] = useState('');
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [vehicleRegistrationNumber, setVehicleRegistrationNumber] = useState('');
+  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
+  const [permitNumber, setPermitNumber] = useState('');
+
+  const requiredDocuments = getRequiredDocuments(city);
+  const permitRequired = requiredDocuments.find((d) => d.key === 'permitNumber')?.required ?? false;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +42,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
           email,
           phone,
           password,
-          ...(role === 'DRIVER' ? { vehicleType } : {}),
+          ...(role === 'DRIVER'
+            ? { vehicleType, city, licenseNumber, vehicleRegistrationNumber, insurancePolicyNumber, permitNumber: permitNumber || undefined }
+            : {}),
         });
       }
     } catch {
@@ -123,20 +134,106 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
                 />
               </div>
               {role === 'DRIVER' && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#454745] uppercase tracking-wider">Vehicle type</label>
-                  <select
-                    value={vehicleType}
-                    onChange={(e) => setVehicleType(e.target.value)}
-                    className="w-full rounded-lg border border-[#0e0f0c]/10 bg-[#e8ebe6] px-4 py-3.5 text-sm font-semibold text-[#0e0f0c] outline-none focus:border-[#0e0f0c] focus:bg-white transition-all"
-                  >
-                    {DRIVER_VEHICLE_TYPES.map((v) => (
-                      <option key={v} value={v}>
-                        {v}
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#454745] uppercase tracking-wider">Vehicle type</label>
+                    <select
+                      value={vehicleType}
+                      onChange={(e) => setVehicleType(e.target.value)}
+                      className="w-full rounded-lg border border-[#0e0f0c]/10 bg-[#e8ebe6] px-4 py-3.5 text-sm font-semibold text-[#0e0f0c] outline-none focus:border-[#0e0f0c] focus:bg-white transition-all"
+                    >
+                      {DRIVER_VEHICLE_TYPES.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#454745] uppercase tracking-wider">City</label>
+                    <select
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full rounded-lg border border-[#0e0f0c]/10 bg-[#e8ebe6] px-4 py-3.5 text-sm font-semibold text-[#0e0f0c] outline-none focus:border-[#0e0f0c] focus:bg-white transition-all"
+                    >
+                      <option value="" disabled>
+                        Select your city
                       </option>
-                    ))}
-                  </select>
-                </div>
+                      {SUPPORTED_CITIES.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {city.trim().length > 0 && (
+                    <div className="rounded-lg bg-[#e2f6d5] border border-[#c5edab] p-3.5 space-y-1.5">
+                      <p className="text-[11px] font-bold text-[#054d28] uppercase tracking-wider">
+                        Documents required in {city.trim()}
+                      </p>
+                      {requiredDocuments.map((doc) => (
+                        <div key={doc.key} className="flex items-center gap-2 text-xs font-semibold text-[#0e0f0c]">
+                          {doc.required ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-[#054d28] shrink-0" />
+                          ) : (
+                            <Circle className="h-3.5 w-3.5 text-[#454745]/50 shrink-0" />
+                          )}
+                          <span>{doc.label}</span>
+                          {!doc.required && <span className="text-[#454745]">(if applicable)</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#454745] uppercase tracking-wider">Driving Licence (DL) number</label>
+                    <input
+                      required
+                      value={licenseNumber}
+                      onChange={(e) => setLicenseNumber(e.target.value)}
+                      className="w-full rounded-lg border border-[#0e0f0c]/10 bg-[#e8ebe6] px-4 py-3.5 text-sm font-semibold text-[#0e0f0c] outline-none focus:border-[#0e0f0c] focus:bg-white transition-all"
+                      placeholder="DL-0420110149646"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#454745] uppercase tracking-wider">Vehicle Registration Certificate (RC) number</label>
+                    <input
+                      required
+                      value={vehicleRegistrationNumber}
+                      onChange={(e) => setVehicleRegistrationNumber(e.target.value)}
+                      className="w-full rounded-lg border border-[#0e0f0c]/10 bg-[#e8ebe6] px-4 py-3.5 text-sm font-semibold text-[#0e0f0c] outline-none focus:border-[#0e0f0c] focus:bg-white transition-all"
+                      placeholder="TS09EA1234"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#454745] uppercase tracking-wider">Insurance policy number</label>
+                    <input
+                      required
+                      value={insurancePolicyNumber}
+                      onChange={(e) => setInsurancePolicyNumber(e.target.value)}
+                      className="w-full rounded-lg border border-[#0e0f0c]/10 bg-[#e8ebe6] px-4 py-3.5 text-sm font-semibold text-[#0e0f0c] outline-none focus:border-[#0e0f0c] focus:bg-white transition-all"
+                      placeholder="POL-889233445"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#454745] uppercase tracking-wider">
+                      Commercial/taxi permit number {!permitRequired && '(optional)'}
+                    </label>
+                    <input
+                      required={permitRequired}
+                      value={permitNumber}
+                      onChange={(e) => setPermitNumber(e.target.value)}
+                      className="w-full rounded-lg border border-[#0e0f0c]/10 bg-[#e8ebe6] px-4 py-3.5 text-sm font-semibold text-[#0e0f0c] outline-none focus:border-[#0e0f0c] focus:bg-white transition-all"
+                      placeholder="PMT-TS-2024-8871"
+                    />
+                  </div>
+                </>
               )}
             </>
           )}

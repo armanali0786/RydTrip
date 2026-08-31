@@ -11,6 +11,11 @@ function toDomain(row: DriverRow): Driver {
     phone: row.phone,
     email: row.email,
     vehicleType: row.vehicleType,
+    city: row.city,
+    licenseNumber: row.licenseNumber,
+    vehicleRegistrationNumber: row.vehicleRegistrationNumber,
+    insurancePolicyNumber: row.insurancePolicyNumber,
+    permitNumber: row.permitNumber ?? undefined,
     status: row.status as DriverStatus,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -29,6 +34,11 @@ export class DriversRepository {
         email: dto.email,
         passwordHash,
         vehicleType: dto.vehicleType,
+        city: dto.city,
+        licenseNumber: dto.licenseNumber,
+        vehicleRegistrationNumber: dto.vehicleRegistrationNumber,
+        insurancePolicyNumber: dto.insurancePolicyNumber,
+        permitNumber: dto.permitNumber,
         status: DriverStatus.OFFLINE,
       },
     });
@@ -38,6 +48,12 @@ export class DriversRepository {
   async findById(id: string): Promise<Driver | null> {
     const row = await this.prisma.driver.findUnique({ where: { id } });
     return row ? toDomain(row) : null;
+  }
+
+  /** Minimal, PII-free projection — safe to expose to unauthenticated riders for a fare estimate. */
+  async findVehicleType(id: string): Promise<string | null> {
+    const row = await this.prisma.driver.findUnique({ where: { id }, select: { vehicleType: true } });
+    return row?.vehicleType ?? null;
   }
 
   async findRowByIdentifier(identifier: string): Promise<DriverRow | null> {

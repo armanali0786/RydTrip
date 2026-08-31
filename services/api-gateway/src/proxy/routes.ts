@@ -14,6 +14,8 @@ const DRIVER_LOCATION_PATTERN = /^\/drivers\/[^/]+\/location$/;
  * events) instead of Trip Service's retired Phase 2/3 bridge endpoint.
  * /drivers/*\/location -> Location Service as of Phase 6 (matched by pattern,
  * since it sits inside the otherwise Driver-Service-owned /drivers prefix).
+ * /drivers/nearby -> Location Service, for the rider-facing real-vehicle
+ * fare estimate — must be listed before the general /drivers prefix below.
  */
 export function getProxyRoutes(): ProxyRoute[] {
   return [
@@ -22,6 +24,7 @@ export function getProxyRoutes(): ProxyRoute[] {
       target: process.env.LOCATION_SERVICE_URL ?? 'http://localhost:3004',
       pattern: DRIVER_LOCATION_PATTERN,
     },
+    { prefix: '/drivers/nearby', target: process.env.LOCATION_SERVICE_URL ?? 'http://localhost:3004' },
     { prefix: '/riders', target: process.env.RIDER_SERVICE_URL ?? 'http://localhost:3001' },
     { prefix: '/rides', target: process.env.RIDER_SERVICE_URL ?? 'http://localhost:3001' },
     { prefix: '/drivers', target: process.env.DRIVER_SERVICE_URL ?? 'http://localhost:3002' },

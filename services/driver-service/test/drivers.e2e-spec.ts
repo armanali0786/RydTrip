@@ -5,6 +5,13 @@ import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
+const VALID_KYC_FIELDS = {
+  city: 'Hyderabad',
+  licenseNumber: 'DL-0420110149646',
+  vehicleRegistrationNumber: 'TS09EA1234',
+  insurancePolicyNumber: 'POL-889233445',
+};
+
 describe('Driver Service (e2e)', () => {
   let container: StartedPostgreSqlContainer;
   let app: INestApplication;
@@ -45,6 +52,7 @@ describe('Driver Service (e2e)', () => {
         email: 'asha@example.com',
         password: 'super-secret',
         vehicleType: 'SEDAN',
+        ...VALID_KYC_FIELDS,
       })
       .expect(201);
 
@@ -66,6 +74,7 @@ describe('Driver Service (e2e)', () => {
         email: 'restart-check-driver@example.com',
         password: 'super-secret',
         vehicleType: 'AUTO',
+        ...VALID_KYC_FIELDS,
       })
       .expect(201);
     const id = createRes.body.id;
@@ -101,6 +110,7 @@ describe('Driver Service (e2e)', () => {
         email: 'not-an-email',
         password: 'super-secret',
         vehicleType: 'SEDAN',
+        ...VALID_KYC_FIELDS,
       })
       .expect(400);
   });
@@ -120,6 +130,7 @@ describe('Driver Service (e2e)', () => {
         email: 'ravi.kumar@example.com',
         password: 'super-secret',
         vehicleType: 'AUTO',
+        ...VALID_KYC_FIELDS,
       })
       .expect(201);
     const id = createRes.body.id;
@@ -145,6 +156,7 @@ describe('Driver Service (e2e)', () => {
         email: 'login-test-driver@example.com',
         password: 'correct-horse',
         vehicleType: 'SEDAN',
+        ...VALID_KYC_FIELDS,
       })
       .expect(201);
 
@@ -168,6 +180,7 @@ describe('Driver Service (e2e)', () => {
         email: 'email-login-driver@example.com',
         password: 'correct-horse',
         vehicleType: 'SEDAN',
+        ...VALID_KYC_FIELDS,
       })
       .expect(201);
 
@@ -188,6 +201,7 @@ describe('Driver Service (e2e)', () => {
         email: 'wrong-password-driver@example.com',
         password: 'correct-horse',
         vehicleType: 'SEDAN',
+        ...VALID_KYC_FIELDS,
       })
       .expect(201);
 

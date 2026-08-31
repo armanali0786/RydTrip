@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { LocationPoint, VehicleType } from '../types';
+import { NearbyVehicleEstimate } from '../api/rides';
 
 export type ActiveTab = 'ride' | 'drive' | 'reserve' | 'rentals' | 'eats';
 
@@ -10,13 +11,17 @@ interface BookingState {
   selectedVehicle: VehicleType;
   scheduleTime: string | null;
   paymentMethod: 'CASH' | 'MOCK_PAYMENT';
-  
+  // The real nearby driver/vehicle RideOptionsList fetched for this pickup —
+  // shared here so createRide can use its real ETA without re-fetching.
+  nearbyVehicle: NearbyVehicleEstimate | null;
+
   setActiveTab: (tab: ActiveTab) => void;
   setPickup: (loc: LocationPoint | null) => void;
   setDestination: (loc: LocationPoint | null) => void;
   setSelectedVehicle: (vehicle: VehicleType) => void;
   setPaymentMethod: (method: 'CASH' | 'MOCK_PAYMENT') => void;
   setScheduleTime: (time: string | null) => void;
+  setNearbyVehicle: (estimate: NearbyVehicleEstimate | null) => void;
   swapPickupDestination: () => void;
   reset: () => void;
 }
@@ -42,6 +47,7 @@ export const useBookingStore = create<BookingState>((set) => ({
   selectedVehicle: 'ECONOMY',
   scheduleTime: null,
   paymentMethod: 'MOCK_PAYMENT',
+  nearbyVehicle: null,
 
   setActiveTab: (activeTab) => set({ activeTab }),
   setPickup: (pickup) => set({ pickup }),
@@ -49,6 +55,7 @@ export const useBookingStore = create<BookingState>((set) => ({
   setSelectedVehicle: (selectedVehicle) => set({ selectedVehicle }),
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setScheduleTime: (scheduleTime) => set({ scheduleTime }),
+  setNearbyVehicle: (nearbyVehicle) => set({ nearbyVehicle }),
 
   swapPickupDestination: () =>
     set((state) => ({
@@ -62,5 +69,6 @@ export const useBookingStore = create<BookingState>((set) => ({
       destination: DEFAULT_DESTINATION,
       selectedVehicle: 'ECONOMY',
       scheduleTime: null,
+      nearbyVehicle: null,
     }),
 }));

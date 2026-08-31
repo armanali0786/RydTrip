@@ -26,7 +26,7 @@ import { LoginPage } from './LoginPage';
  * navigation — carries straight through once they've logged in.
  */
 export const RiderPage: React.FC = () => {
-  const { pickup, destination, selectedVehicle, paymentMethod } = useBookingStore();
+  const { pickup, destination, selectedVehicle, paymentMethod, nearbyVehicle } = useBookingStore();
   const { activeRide, driverLocation, setActiveRide, updateRideStatus, assignDriver, updateDriverLocation, cancelActiveRide, resetRide } =
     useRideStore();
   const { user, isAuthenticated } = useAuthStore();
@@ -82,6 +82,7 @@ export const RiderPage: React.FC = () => {
         destination,
         vehicleType: selectedVehicle,
         paymentMethod,
+        etaMinutes: nearbyVehicle?.option.eta ?? 5,
       });
 
       setActiveRide(newRide);

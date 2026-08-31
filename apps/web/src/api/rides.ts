@@ -10,6 +10,8 @@ export interface CreateRideRequest {
   destination: LocationPoint;
   vehicleType: VehicleType;
   paymentMethod: 'CASH' | 'MOCK_PAYMENT';
+  /** Real ETA of the nearby driver found for this pickup (see findNearbyVehicle). */
+  etaMinutes: number;
 }
 
 // Backend's real accepted shape (services/rider-service/src/rides/dto/*.ts):
@@ -19,44 +21,112 @@ interface BackendCreateRideResponse {
   status: string;
 }
 
-export const VEHICLE_OPTIONS: VehicleOption[] = [
-  {
-    type: 'ECONOMY',
+// Cosmetic display metadata per category (name/image/capacity/tagline/base
+// fare) — there's no pricing-service, so a base fare is still a client-side
+// stand-in. What's no longer fake: *which* category is shown, and its ETA —
+// both now come from a real nearby driver (see findNearbyVehicle below)
+// instead of always listing all four regardless of who's actually online.
+const VEHICLE_METADATA: Record<VehicleType, Omit<VehicleOption, 'type' | 'eta'>> = {
+  ECONOMY: {
     name: 'RydTrip Go',
     capacity: 4,
-    eta: 3,
     fare: 240,
     image: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=150&auto=format&fit=crop&q=80',
     tagline: 'Affordable, compact rides',
   },
-  {
-    type: 'PREMIUM',
+  PREMIUM: {
     name: 'RydTrip Premier',
     capacity: 4,
-    eta: 5,
     fare: 390,
     image: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=150&auto=format&fit=crop&q=80',
     tagline: 'Comfortable sedans with top-rated drivers',
   },
-  {
-    type: 'AUTO',
+  AUTO: {
     name: 'RydTrip Auto',
     capacity: 3,
-    eta: 2,
     fare: 140,
     image: 'https://images.unsplash.com/photo-1596484552834-6a58f850e0a1?w=150&auto=format&fit=crop&q=80',
     tagline: 'No haggling, auto at your doorstep',
   },
-  {
-    type: 'XL',
+  MOTO: {
+    name: 'RydTrip Moto',
+    capacity: 1,
+    fare: 80,
+    image: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=150&auto=format&fit=crop&q=80',
+    tagline: 'Quick bike rides, beat the traffic',
+  },
+  XL: {
     name: 'RydTrip XL',
     capacity: 6,
-    eta: 6,
     fare: 550,
     image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=150&auto=format&fit=crop&q=80',
     tagline: 'Spacious SUVs for group travel',
   },
-];
+};
+
+// Maps Driver Service's stored vehicleType (see create-driver.dto.ts) to this
+// app's rider-facing category.
+const DRIVER_VEHICLE_TYPE_MAP: Record<string, VehicleType> = {
+  HATCHBACK: 'ECONOMY',
+  SEDAN: 'PREMIUM',
+  SUV: 'XL',
+  AUTO: 'AUTO',
+  BIKE: 'MOTO',
+};
+
+interface NearbyDriverResult {
+  driverId: string;
+  lat: number;
+  lng: number;
+  distanceKm: number;
+}
+
+async function fetchNearbyDrivers(pickup: LocationPoint, radiusKm: number): Promise<NearbyDriverResult[]> {
+  const params = new URLSearchParams({
+    lat: String(pickup.latitude),
+    lng: String(pickup.longitude),
+    radiusKm: String(radiusKm),
+    limit: '1',
+  });
+  const res = await apiFetch<{ drivers: NearbyDriverResult[] }>(`/drivers/nearby?${params}`);
+  return res.drivers;
+}
+
+export interface NearbyVehicleEstimate {
+  option: VehicleOption;
+  driverId: string;
+  driverDistanceKm: number;
+}
+
+/**
+ * The real replacement for the old static 4-option list: finds the single
+ * actual nearest online driver (Location Service's Redis GEO index) and
+ * builds one vehicle card from their real vehicle type and real distance —
+ * not a fabricated category/eta. Widens the search radius once before
+ * concluding no one is online nearby. Fare still uses the client-side
+ * distance formula (no pricing-service exists yet).
+ */
+export async function findNearbyVehicle(pickup: LocationPoint): Promise<NearbyVehicleEstimate | null> {
+  let drivers = await fetchNearbyDrivers(pickup, 10);
+  if (drivers.length === 0) {
+    drivers = await fetchNearbyDrivers(pickup, 50);
+  }
+  if (drivers.length === 0) {
+    return null;
+  }
+
+  const nearest = drivers[0];
+  const { vehicleType } = await apiFetch<{ vehicleType: string }>(`/drivers/${nearest.driverId}/vehicle`);
+  const type = DRIVER_VEHICLE_TYPE_MAP[vehicleType] ?? 'ECONOMY';
+  const meta = VEHICLE_METADATA[type];
+  const etaMinutes = Math.max(1, Math.round((nearest.distanceKm / 25) * 60));
+
+  return {
+    option: { type, eta: etaMinutes, ...meta },
+    driverId: nearest.driverId,
+    driverDistanceKm: nearest.distanceKm,
+  };
+}
 
 // Helper to calculate distance in KM between 2 points
 export function calculateDistanceKm(p1: LocationPoint, p2: LocationPoint): number {
@@ -86,8 +156,8 @@ export async function createRide(req: CreateRideRequest): Promise<Ride> {
   const distanceKm = calculateDistanceKm(req.pickup, req.destination);
   const durationMins = Math.round(distanceKm * 2.5);
 
-  const baseOption = VEHICLE_OPTIONS.find((v) => v.type === req.vehicleType) || VEHICLE_OPTIONS[0];
-  const calculatedFare = Math.round(baseOption.fare + distanceKm * 15);
+  const baseMeta = VEHICLE_METADATA[req.vehicleType] ?? VEHICLE_METADATA.ECONOMY;
+  const calculatedFare = Math.round(baseMeta.fare + distanceKm * 15);
 
   const backendRes = await apiFetch<BackendCreateRideResponse>('/rides', {
     method: 'POST',
@@ -110,7 +180,7 @@ export async function createRide(req: CreateRideRequest): Promise<Ride> {
     status: 'REQUESTED',
     distanceKm,
     durationMins,
-    etaMinutes: baseOption.eta,
+    etaMinutes: req.etaMinutes,
     paymentMethod: req.paymentMethod,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

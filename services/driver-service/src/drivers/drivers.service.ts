@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException, UnauthorizedException
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import { Driver, DriverStatus } from '@rydtrip/event-schema';
+import { Prisma } from '../../prisma-client';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { LoginDriverDto } from './dto/login-driver.dto';
 import { assertValidDriverTransition, InvalidDriverTransitionError } from './driver-state-machine';
@@ -23,7 +24,15 @@ export class DriversService {
 
   async create(dto: CreateDriverDto): Promise<Driver> {
     const passwordHash = await hash(dto.password, PASSWORD_SALT_ROUNDS);
-    return this.repository.create(dto, passwordHash);
+    try {
+      return await this.repository.create(dto, passwordHash);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[] | undefined)?.join(', ') ?? 'phone or email';
+        throw new ConflictException(`A driver with this ${target} is already registered`);
+      }
+      throw err;
+    }
   }
 
   async findById(id: string): Promise<Driver> {
@@ -32,6 +41,14 @@ export class DriversService {
       throw new NotFoundException(`Driver ${id} not found`);
     }
     return driver;
+  }
+
+  async findVehicleType(id: string): Promise<{ vehicleType: string }> {
+    const vehicleType = await this.repository.findVehicleType(id);
+    if (!vehicleType) {
+      throw new NotFoundException(`Driver ${id} not found`);
+    }
+    return { vehicleType };
   }
 
   async login(dto: LoginDriverDto): Promise<AuthResult> {
@@ -46,6 +63,11 @@ export class DriversService {
       phone: row.phone,
       email: row.email,
       vehicleType: row.vehicleType,
+      city: row.city,
+      licenseNumber: row.licenseNumber,
+      vehicleRegistrationNumber: row.vehicleRegistrationNumber,
+      insurancePolicyNumber: row.insurancePolicyNumber,
+      permitNumber: row.permitNumber ?? undefined,
       status: row.status as DriverStatus,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

@@ -20,6 +20,11 @@ export interface Driver {
   phone: string;
   email: string;
   vehicleType: string;
+  city: string;
+  licenseNumber: string;
+  vehicleRegistrationNumber: string;
+  insurancePolicyNumber: string;
+  permitNumber?: string;
   status: DriverStatus;
   createdAt: string;
   updatedAt: string;

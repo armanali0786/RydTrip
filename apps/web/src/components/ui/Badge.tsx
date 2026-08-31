@@ -7,6 +7,7 @@ export const ConnectionBadge: React.FC<{ state: ConnectionState }> = ({ state })
     CONNECTING: { color: 'bg-amber-500', text: 'Connecting...', ping: false },
     RECONNECTING: { color: 'bg-amber-500', text: 'Reconnecting...', ping: false },
     DISCONNECTED: { color: 'bg-rose-500', text: 'Offline', ping: false },
+    LOCAL: { color: 'bg-slate-400', text: 'Local Demo Mode', ping: false },
   };
 
   const current = config[state] || config.DISCONNECTED;

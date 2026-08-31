@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import { Rider } from '@rydtrip/event-schema';
+import { Prisma } from '../../prisma-client';
 import { CreateRiderDto } from './dto/create-rider.dto';
 import { LoginRiderDto } from './dto/login-rider.dto';
 import { RidersRepository } from './riders.repository';
@@ -22,7 +23,15 @@ export class RidersService {
 
   async create(dto: CreateRiderDto): Promise<Rider> {
     const passwordHash = await hash(dto.password, PASSWORD_SALT_ROUNDS);
-    return this.repository.create(dto, passwordHash);
+    try {
+      return await this.repository.create(dto, passwordHash);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[] | undefined)?.join(', ') ?? 'phone or email';
+        throw new ConflictException(`A rider with this ${target} is already registered`);
+      }
+      throw err;
+    }
   }
 
   async findById(id: string): Promise<Rider> {

@@ -2,11 +2,14 @@ import { WebSocketEvent, WebSocketEventType } from '../types';
 import { EventDispatcher, EventListener } from './events';
 import { ReconnectStrategy } from './reconnect';
 
-export type ConnectionState = 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING';
+export type ConnectionState = 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'RECONNECTING' | 'LOCAL';
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private url: string;
+  /** No backend gateway exists yet — see docs/roadmap. Without an explicit VITE_WS_URL we
+   * skip real WebSocket attempts entirely and rely on BroadcastChannel for the local demo. */
+  private hasBackend: boolean;
   private state: ConnectionState = 'DISCONNECTED';
   private dispatcher: EventDispatcher = new EventDispatcher();
   private reconnectStrategy: ReconnectStrategy = new ReconnectStrategy();
@@ -14,8 +17,10 @@ export class WebSocketClient {
   private stateListeners: Set<(state: ConnectionState) => void> = new Set();
   private reconnectTimer: any = null;
 
-  constructor(url: string = import.meta.env.VITE_WS_URL || 'ws://localhost:3000') {
-    this.url = url;
+  constructor(url?: string) {
+    const envUrl = import.meta.env.VITE_WS_URL;
+    this.hasBackend = Boolean(url || envUrl);
+    this.url = url || envUrl || 'ws://localhost:3000';
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       this.broadcastChannel = new BroadcastChannel('ridemesh_realtime_channel');
       this.broadcastChannel.onmessage = (event) => {
@@ -28,6 +33,11 @@ export class WebSocketClient {
 
   public connect(): void {
     if (this.state === 'CONNECTED' || this.state === 'CONNECTING') return;
+
+    if (!this.hasBackend) {
+      this.updateState('LOCAL');
+      return;
+    }
 
     this.updateState('CONNECTING');
     try {

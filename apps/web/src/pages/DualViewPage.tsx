@@ -17,7 +17,7 @@ import { RequireAuth } from '../components/auth/RequireAuth';
 
 const DualViewPageContent: React.FC = () => {
   const { user } = useAuthStore();
-  const { pickup, destination, selectedVehicle, paymentMethod } = useBookingStore();
+  const { pickup, destination, selectedVehicle, paymentMethod, nearbyVehicle } = useBookingStore();
   const { activeRide, driverLocation, setActiveRide, updateRideStatus, assignDriver, updateDriverLocation, resetRide } =
     useRideStore();
   const {
@@ -72,6 +72,7 @@ const DualViewPageContent: React.FC = () => {
       destination,
       vehicleType: selectedVehicle,
       paymentMethod,
+      etaMinutes: nearbyVehicle?.option.eta ?? 5,
     });
     setActiveRide(newRide);
   };

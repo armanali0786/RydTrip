@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsIn, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export const VEHICLE_TYPES = ['SEDAN', 'SUV', 'HATCHBACK', 'AUTO', 'BIKE'] as const;
 
@@ -27,4 +27,29 @@ export class CreateDriverDto {
   @IsString()
   @IsIn(VEHICLE_TYPES)
   vehicleType!: string;
+
+  @ApiProperty({ example: 'Hyderabad', description: 'Onboarding city — drives which documents are suggested as required' })
+  @IsString()
+  @IsNotEmpty()
+  city!: string;
+
+  @ApiProperty({ example: 'DL-0420110149646', description: 'Driving Licence number' })
+  @IsString()
+  @IsNotEmpty()
+  licenseNumber!: string;
+
+  @ApiProperty({ example: 'TS09EA1234', description: 'Vehicle Registration Certificate (RC) number' })
+  @IsString()
+  @IsNotEmpty()
+  vehicleRegistrationNumber!: string;
+
+  @ApiProperty({ example: 'POL-889233445', description: 'Vehicle insurance policy number' })
+  @IsString()
+  @IsNotEmpty()
+  insurancePolicyNumber!: string;
+
+  @ApiPropertyOptional({ example: 'PMT-TS-2024-8871', description: 'Commercial/taxi permit number — required in some cities' })
+  @IsOptional()
+  @IsString()
+  permitNumber?: string;
 }
