@@ -63,12 +63,12 @@ flowchart TD
 
     LocationSvc -->|Update Driver Location| Redis
     DispatchSvc -->|Consume trip.requested| Kafka
-    DispatchSvc -->|Query Nearby Drivers (GEORADIUS)| Redis
+    DispatchSvc -->|"Query Nearby Drivers (GEORADIUS)"| Redis
     DispatchSvc -->|Atomic Driver Lock| Redis
     DispatchSvc -->|Publish trip.accepted| Kafka
 
     TripSvc -->|Consume trip.accepted| Kafka
-    TripSvc -->|Update State (ACCEPTED)| Postgres
+    TripSvc -->|"Update State (ACCEPTED)"| Postgres
 ```
 
 ### End-to-End Dispatch Flow
