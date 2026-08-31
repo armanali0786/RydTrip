@@ -9,7 +9,6 @@
 ## 📸 Visual Showcase
 
 ### 1. Rider Booking & Search Interface
-![RydTrip Hero Booking Interface]
 <img width="1850" height="892" alt="Screenshot from 2026-09-01 00-52-43" src="https://github.com/user-attachments/assets/40a83259-cbc4-4251-8013-c6efe014f263" />
 
 ### 2. Driver Partner Program & Real-Time Earnings
@@ -17,7 +16,7 @@
 
 
 ### 3. Distributed Platform Features & Mobile Apps
-![RydTrip Features & Downloads] <img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-08" src="https://github.com/user-attachments/assets/f30d0281-9478-447f-8e3a-cde765217edb" />
+<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-08" src="https://github.com/user-attachments/assets/f30d0281-9478-447f-8e3a-cde765217edb" />
 oad.png)
 
 ---
