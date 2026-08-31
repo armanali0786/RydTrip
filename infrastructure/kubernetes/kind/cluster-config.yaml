@@ -1,0 +1,13 @@
+# Single-node kind cluster: this dev machine is already running a separate
+# 3-node kind cluster (unrelated project) plus the full rydtrip
+# docker-compose stack, and a control-plane + worker attempt genuinely
+# failed to bootstrap here (kubelet never became healthy, swap maxed out).
+# A single node still schedules the control-plane's own workloads onto
+# itself (kind removes the default control-plane NoSchedule taint), so app
+# pods, HPA, and pod-deletion recovery all still demo correctly — it just
+# isn't multi-node.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: rydtrip
+nodes:
+  - role: control-plane

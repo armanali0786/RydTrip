@@ -1,0 +1,11 @@
+apiVersion: v2
+name: rydtrip
+description: >
+  RydTrip's six NestJS microservices on Kubernetes (Phase 9). Postgres, Kafka,
+  and Redis are deliberately not part of this chart — they stay in
+  docker-compose (see infrastructure/kubernetes/README.md for why and how
+  pods reach them) — this chart only owns the app services it's the direct
+  Kubernetes analogue of docker-compose.yml's own service list.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

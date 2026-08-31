@@ -21,7 +21,7 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 | 6 | Redis + GEO | 🟢 Done | 5 |
 | 7 | Dispatch / Matching Engine | 🟢 Done | 6 |
 | 8 | Reliability + Distributed Systems | 🟢 Done | 7 |
-| 9 | Kubernetes (local) | ⚪ Not started | 8 |
+| 9 | Kubernetes (local) | 🟢 Done | 8 |
 | 10 | Observability | ⚪ Not started | 9 |
 | 11 | Security | ⚪ Not started | 10 |
 | 12 | CI/CD | ⚪ Not started | 11 |
@@ -275,14 +275,46 @@ Exit criteria:
 **Goal:** every service runs on Kubernetes locally, matching the target EKS shape.
 
 Deliverables:
-- Deployment/Service/ConfigMap/Secret manifests (or Helm chart) per service
-- Liveness/readiness probes wired to `/health/live`, `/health/ready`
-- Resource requests/limits set from observed local usage, not guessed
-- HPA on dispatch-service and location-service
+- **A single Helm chart** (`infrastructure/kubernetes/helm/rydtrip`) covering all six app
+  services with one Deployment + Service per service, a shared `rydtrip-jwt-secret`
+  Secret for the three services that need `JWT_SECRET`, and env vars supplied per-service
+  via `values.yaml` — chosen over raw per-service manifests specifically to avoid
+  duplicating near-identical YAML six times over, and because it sets up naturally for
+  Phase 14's GitOps/Argo CD.
+- Liveness/readiness probes on every Deployment, wired to `/health/live` / `/health/ready`.
+- Resource requests/limits (`values.yaml`'s `resources` block) set from `docker stats`
+  against the actual running docker-compose containers at idle (40-70MiB / 10-13% of one
+  core) — a starting floor, not load-tested tuning (that's Phase 15).
+- HPA (`autoscaling/v2`, CPU utilization target) on `dispatch-service` and
+  `location-service`, `minReplicas: 1`, `maxReplicas: 4`.
+- **Postgres/Kafka/Redis deliberately stay in docker-compose**, not this cluster — see
+  `infrastructure/kubernetes/README.md` for the full rationale and the `hostAliases`
+  mechanism that lets pods resolve `postgres`/`kafka`/`redis` by the exact same hostnames
+  docker-compose's own services already use (`infrastructure/kubernetes/scripts/up.sh`
+  wires this up automatically).
+- kind cluster is single control-plane node, not multi-node — see
+  `infrastructure/kubernetes/kind/cluster-config.yaml`'s comment: this dev machine already
+  runs a second, unrelated kind cluster, and a control-plane + worker attempt genuinely
+  failed to bootstrap here (kubelet health-check timeout) under the combined load. A
+  single node still schedules normally (kind removes the control-plane's NoSchedule
+  taint), so it doesn't weaken either exit criterion below.
+- `metrics-server` (`infrastructure/kubernetes/metrics-server/`), patched with
+  `--kubelet-insecure-tls` — the standard kind-only adjustment, since kind's kubelet
+  serving certs aren't signed for what metrics-server's default TLS verification expects.
 
 Exit criteria:
-- [ ] `kubectl delete pod <dispatch-pod>` — traffic continues, pod is recreated (Failure Test 1)
-- [ ] Load increase visibly triggers HPA scale-out on `kind`
+- [x] `kubectl delete pod <dispatch-pod>` — traffic continues, pod is recreated (Failure
+  Test 1) — verified live: deleted a running `dispatch-service` pod, immediately
+  published a `ride.requested` event while the replacement pod was still starting. The
+  Deployment recreated the pod under a new name within seconds, and the event — durable
+  on its Kafka partition rather than lost — was picked up and correctly matched once the
+  new pod became ready.
+- [x] Load increase visibly triggers HPA scale-out on `kind` — verified live: a burst of
+  ~4000 `ride.requested` events drove `dispatch-service` from 1 to its `maxReplicas` of 4
+  (and `location-service` 1 to 4 as a side effect of the same load), with
+  `kubectl -n rydtrip describe hpa dispatch-service` recording the decision directly:
+  `SuccessfulRescale ... reason: cpu resource utilization (percentage of request) above
+  target`.
 
 ---
 

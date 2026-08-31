@@ -101,6 +101,14 @@ run it locally against the same Postgres: copy `services/<service>/.env.example`
 [`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md) for what each phase actually built and
 its exit criteria.
 
+## Kubernetes (Phase 9)
+
+All six app services also run on a local `kind` cluster via a single Helm chart —
+Postgres/Kafka/Redis stay in docker-compose. See
+[`infrastructure/kubernetes/README.md`](infrastructure/kubernetes/README.md) for how pods
+reach the docker-compose infra, and `infrastructure/kubernetes/scripts/up.sh` to bring the
+cluster up.
+
 ## Reliability (Phase 8)
 
 Every Kafka consumer retries transient failures (exponential backoff + jitter) and, once

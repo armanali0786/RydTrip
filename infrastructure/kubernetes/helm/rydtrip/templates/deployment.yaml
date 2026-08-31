@@ -1,0 +1,57 @@
+{{- range $name, $svc := .Values.services }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+    {{- include "rydtrip.labels" $ | nindent 4 }}
+spec:
+  # HPA-managed services start at their hpa.minReplicas and are then scaled
+  # by the HPA controller, not by re-running `helm upgrade` — see hpa.yaml.
+  replicas: {{ if $svc.hpa }}{{ $svc.hpa.minReplicas }}{{ else }}1{{ end }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+    spec:
+      {{- include "rydtrip.hostAliases" (list $ $svc.hostAliases) | nindent 6 }}
+      containers:
+        - name: {{ $name }}
+          image: "rydtrip-{{ $name }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $svc.port }}
+          env:
+            - name: PORT
+              value: {{ $svc.port | quote }}
+            {{- range $key, $value := $svc.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if $svc.useJwtSecret }}
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: rydtrip-jwt-secret
+                  key: JWT_SECRET
+            {{- end }}
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: {{ $svc.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: {{ $svc.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+{{- end }}

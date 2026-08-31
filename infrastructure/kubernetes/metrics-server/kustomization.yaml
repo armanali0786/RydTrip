@@ -1,0 +1,14 @@
+# Upstream metrics-server, patched for kind: kind's kubelet certs aren't
+# signed for a name metrics-server's default TLS verification accepts, so
+# --kubelet-insecure-tls is required — a standard, well-documented kind-only
+# adjustment (not something you'd do against a real cluster/EKS).
+resources:
+  - https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+patches:
+  - target:
+      kind: Deployment
+      name: metrics-server
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --kubelet-insecure-tls

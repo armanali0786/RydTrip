@@ -1,0 +1,105 @@
+# Local-only images: built via `docker compose build`, loaded into kind via
+# `kind load docker-image rydtrip-<service>:<tag> --name rydtrip` (see
+# infrastructure/kubernetes/scripts/up.sh) — never pulled from a registry,
+# hence pullPolicy Never rather than the usual IfNotPresent/Always.
+image:
+  tag: latest
+  pullPolicy: Never
+
+# Postgres/Kafka/Redis stay in docker-compose (see the chart README) rather
+# than moving into this cluster — these are the container IPs on the
+# `rydtrip_default` docker network, used to build each pod's hostAliases so
+# `postgres`/`kafka`/`redis` resolve exactly like they do for the
+# docker-compose services themselves. Populated by
+# infrastructure/kubernetes/scripts/up.sh via `docker inspect`; if the
+# compose stack is recreated these IPs can change, so re-run that script (or
+# `helm upgrade --set composeNetwork...`) if pods lose connectivity.
+composeNetwork:
+  postgresIp: ""
+  kafkaIp: ""
+  redisIp: ""
+
+# Same default as docker-compose.yml's JWT_SECRET — override for anything
+# beyond local dev (see ADR-005: this is still a shared plaintext value by
+# design until Phase 11/13).
+jwtSecret: "dev-shared-secret-change-me"
+
+# Baseline observed via `docker stats` against the actual running
+# docker-compose containers (idle steady-state, no induced load): NestJS
+# services sat at roughly 40-70MiB RSS / 10-13% of one CPU core. requests
+# is set at that floor with a little headroom; limits leave real burst
+# room. This is a starting point, not load-tested tuning — that's Phase 15's
+# job (load-tests/, performance + failure testing).
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+services:
+  rider-service:
+    port: 3001
+    hostAliases: [postgres, kafka]
+    useJwtSecret: true
+    env:
+      DATABASE_URL: postgresql://rydtrip:rydtrip@postgres:5432/rydtrip_riders
+      KAFKA_BROKERS: kafka:9092
+      JWT_EXPIRES_IN: 1d
+
+  driver-service:
+    port: 3002
+    hostAliases: [postgres]
+    useJwtSecret: true
+    env:
+      DATABASE_URL: postgresql://rydtrip:rydtrip@postgres:5432/rydtrip_drivers
+      JWT_EXPIRES_IN: 1d
+
+  trip-service:
+    port: 3003
+    hostAliases: [postgres, kafka]
+    env:
+      DATABASE_URL: postgresql://rydtrip:rydtrip@postgres:5432/rydtrip_trips
+      KAFKA_BROKERS: kafka:9092
+
+  location-service:
+    port: 3004
+    hostAliases: [redis, kafka]
+    env:
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      DRIVER_HEARTBEAT_TTL_SECONDS: "30"
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 4
+      targetCPUUtilizationPercentage: 60
+
+  dispatch-service:
+    port: 3005
+    hostAliases: [redis, kafka]
+    env:
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      DRIVER_SERVICE_URL: http://driver-service:3002
+      RESERVATION_TTL_SECONDS: "30"
+      DISPATCH_SEARCH_RADIUS_KM: "5"
+      DISPATCH_CANDIDATE_LIMIT: "5"
+      DISPATCH_CIRCUIT_FAILURE_THRESHOLD: "5"
+      DISPATCH_CIRCUIT_RESET_TIMEOUT_MS: "10000"
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 4
+      targetCPUUtilizationPercentage: 60
+
+  api-gateway:
+    port: 3000
+    hostAliases: []
+    useJwtSecret: true
+    env:
+      RIDER_SERVICE_URL: http://rider-service:3001
+      DRIVER_SERVICE_URL: http://driver-service:3002
+      TRIP_SERVICE_URL: http://trip-service:3003
+      LOCATION_SERVICE_URL: http://location-service:3004
