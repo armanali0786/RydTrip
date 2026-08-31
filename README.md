@@ -1,133 +1,180 @@
 # 🚕 RydTrip
 
-Cost-optimized, real-time distributed ride dispatch platform — built locally first
-(₹0 out-of-pocket), with AWS used only for controlled, temporary cloud demonstrations.
+![RydTrip Brand Banner](docs/images/rydtrip-banner.png)
 
-## What this is
+**Production-grade, real-time distributed ride-hailing & dispatch platform** powered by an event-driven microservices architecture, low-latency geospatial matching, atomic driver reservation under high concurrency, and a fintech-grade responsive frontend UI.
 
-A production-style backend system covering the distributed-systems problems found in
-ride-hailing platforms: event-driven microservices, low-latency geo-matching, atomic
-driver reservation under concurrency, Kafka-based reliability patterns, Kubernetes
-scaling, and a full CI/CD + GitOps + observability stack.
+---
 
-This is **not** a CRUD demo. See [`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md) for
-why each piece exists and in what order it gets built.
+## 📸 Visual Showcase
 
-## Build order
+### 1. Rider Booking & Search Interface
+![RydTrip Hero Booking Interface](docs/images/hero-booking.png)
 
-The project is implemented **one phase at a time** — see
-[`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md) for the full plan, current status,
-and exit criteria for every phase. Do not skip ahead; each phase's exit criteria are the
-gate for starting the next.
+### 2. Driver Partner Program & Real-Time Earnings
+![RydTrip Driver Partner Showcase](docs/images/driver-showcase.png)
 
-| Phase | Focus |
-|---|---|
-| 0 | Environment + engineering foundation |
-| 1 | System design + PRD |
-| 2 | NestJS + microservices foundation |
-| 3 | PostgreSQL + Prisma |
-| 4 | Docker + local infrastructure |
-| 5 | Kafka + event-driven architecture |
-| 6 | Redis + GEO |
-| 7 | Dispatch / matching engine |
-| 8 | Reliability + distributed systems |
-| 9 | Kubernetes (local) |
-| 10 | Observability |
-| 11 | Security |
-| 12 | CI/CD |
-| 13 | Terraform + AWS |
-| 14 | GitOps |
-| 15 | Performance + failure testing |
-| 16 | Final AWS production-style demo |
+### 3. Distributed Platform Features & Mobile Apps
+![RydTrip Features & Downloads](docs/images/features-download.png)
 
-## Stack
+---
 
-Node.js 22 LTS · TypeScript · NestJS · Prisma · PostgreSQL · Redis (+ GEO) · Apache Kafka
-(KafkaJS) · Docker · Kubernetes (kind → EKS) · Helm · Terraform · GitHub Actions ·
-Argo CD · Prometheus/Grafana · OpenTelemetry/Jaeger · Jest/Testcontainers/Supertest/k6.
+## 🏗️ System Design & Architecture
 
-## Repository layout
+RydTrip is designed as a distributed, decoupled event-driven system built with Node.js/NestJS microservices communicating over **Apache Kafka**, **Redis GEO**, and **PostgreSQL/PostGIS**.
 
-```text
-services/           NestJS microservices (added starting Phase 2)
-libraries/           shared packages: event-schema, observability, security
-infrastructure/      terraform/ and kubernetes/ (helm charts, argocd manifests)
-load-tests/          k6 scripts
-docs/
-  architecture/      system design, data model, PRD
-  adr/               architecture decision records
-  roadmap/           PHASES.md — the phase-wise implementation plan
-  diagrams/          Mermaid/exported diagrams
-  performance/       load test results
-  failure-tests/     chaos test write-ups
-  security/          threat model, security notes
+```mermaid
+flowchart TD
+    subgraph Frontend["RydTrip Frontend Layer (React 18 + Vite)"]
+        RiderUI["Rider Web App\n(Booking, Fare Estimation, Map)"]
+        DriverUI["Driver Web App\n(Accept/Decline, Location Telemetry)"]
+        DualUI["Dual Dispatch Simulator"]
+    end
+
+    subgraph GatewayLayer["API Gateway & Reverse Proxy (Port 3000)"]
+        Gateway["NestJS API Gateway\n(JWT Auth, Rate Limiting, Routing)"]
+    end
+
+    subgraph Microservices["Backend Microservices Layer"]
+        RiderSvc["Rider Service\n(Profile, Rating, History)"]
+        DriverSvc["Driver Service\n(Status, Vehicle Info)"]
+        TripSvc["Trip Service\n(Booking State Machine, Fares)"]
+        LocationSvc["Location Service\n(GPS Telemetry Stream)"]
+        DispatchSvc["Dispatch / Matching Engine\n(Geo Radius Search)"]
+    end
+
+    subgraph StorageLayer["Data & Event Streaming Layer"]
+        Kafka["Apache Kafka Broker\n(Topics: trip.requested, trip.accepted, driver.location)"]
+        Redis["Redis + Redis GEO\n(Driver Spatial Index & Cache)"]
+        Postgres[("PostgreSQL + PostGIS\n(Persistent Storage & Spatial Queries)")]
+    end
+
+    RiderUI -->|REST / WebSocket| Gateway
+    DriverUI -->|REST / WebSocket| Gateway
+    DualUI -->|REST / WebSocket| Gateway
+
+    Gateway --> RiderSvc
+    Gateway --> DriverSvc
+    Gateway --> TripSvc
+    Gateway --> LocationSvc
+
+    TripSvc -->|Persist Trip| Postgres
+    TripSvc -->|Publish trip.requested| Kafka
+
+    LocationSvc -->|Update Driver Location| Redis
+    DispatchSvc -->|Consume trip.requested| Kafka
+    DispatchSvc -->|Query Nearby Drivers (GEORADIUS)| Redis
+    DispatchSvc -->|Atomic Driver Lock| Redis
+    DispatchSvc -->|Publish trip.accepted| Kafka
+
+    TripSvc -->|Consume trip.accepted| Kafka
+    TripSvc -->|Update State (ACCEPTED)| Postgres
 ```
 
-## Cost philosophy
+### End-to-End Dispatch Flow
+1. **Booking Request**: Rider submits pickup and dropoff points via the **HeroRideForm** on the web app.
+2. **API Routing**: The **API Gateway** validates JWT tokens and routes request to **Trip Service**.
+3. **Event Emission**: **Trip Service** persists the pending trip into **PostgreSQL** and emits a `trip.requested` event to **Kafka**.
+4. **Geospatial Matching**: **Dispatch Engine** consumes `trip.requested`, queries **Redis GEO** for active drivers within a 5 km radius, and broadcasts candidate trip requests over WebSockets.
+5. **Atomic Reservation**: The first driver to click *Accept* acquires an atomic lock in **Redis** (preventing double-booking). Dispatch emits `trip.accepted`.
+6. **Telemetry & Live Tracking**: **Location Service** ingests driver GPS coordinates and streams real-time updates back to the Rider's **Leaflet map**.
 
-Everything through Phase 12 runs entirely locally at ₹0. AWS is introduced in Phase 13
-for cloud-native pieces only (VPC/EKS/ECR/IAM), and managed Kafka/Redis/Postgres
-(MSK/ElastiCache/Aurora) are stood up only for the temporary Phase 16 demo, then
-destroyed. Nothing billable is left running between sessions.
+---
 
-## Getting started
+## 🛠️ Complete Tech Stack
 
-Bring up the whole local stack (Postgres, Redis, Kafka + all six services) with:
+### **Frontend & UI Layer**
+- **Framework**: React 18, Vite, TypeScript
+- **Design System**: Customized Wise-inspired fintech aesthetic (lime-green `#9fe870` CTA accents, sage `#e8ebe6` canvas, weight 900 display typography, 24px canonical rounded cards)
+- **Styling**: Tailwind CSS, CSS Custom Tokens
+- **Mapping & Geospatial**: Leaflet, React-Leaflet
+- **State Management**: Zustand (with session persistence), TanStack React Query
+- **Icons & UI Components**: Lucide-React, clsx, tailwind-merge
+
+### **Backend Microservices**
+- **Core Framework**: NestJS, TypeScript, Node.js 22 LTS
+- **ORM & Database**: Prisma ORM, PostgreSQL + PostGIS (spatial queries)
+- **Event Streaming**: Apache Kafka (KafkaJS) with Dead Letter Topics (DLT) & exponential backoff retries
+- **In-Memory Cache & GEO**: Redis (+ Redis GEO indexing for driver locations)
+- **Real-Time Communication**: WebSockets (`socket.io` / native WS)
+
+### **DevOps & Infrastructure**
+- **Containerization**: Docker, Docker Compose
+- **Orchestration**: Kubernetes (`kind` local cluster, EKS for production cloud demos), Helm Charts
+- **GitOps & CI/CD**: Argo CD, GitHub Actions
+- **Infrastructure as Code (IaC)**: Terraform
+- **Observability**: Prometheus, Grafana, OpenTelemetry, Jaeger tracing
+- **Testing**: Jest, Supertest, Testcontainers, k6 performance benchmarking
+
+---
+
+## 📁 Repository Layout
+
+```text
+RydTrip/
+├── apps/
+│   ├── web/                 # React 18 + Vite Frontend App (Rider, Driver, Dual Mode)
+│   └── driver-web/          # Dedicated Driver Interface App
+├── services/
+│   ├── api-gateway/         # NestJS Gateway & Reverse Proxy
+│   ├── rider-service/       # Rider profile management
+│   ├── driver-service/      # Driver onboarding & vehicle details
+│   ├── trip-service/        # Booking state machine & fare computation
+│   ├── location-service/    # Real-time GPS location ingestion
+│   └── dispatch-service/    # Kafka-driven driver matching engine
+├── libraries/               # Shared packages (event-schema, security, observability)
+├── infrastructure/          # Terraform scripts & Kubernetes Helm/ArgoCD manifests
+├── docs/
+│   ├── images/              # README Screenshots (hero, driver, features)
+│   ├── architecture/        # System design docs & PRD
+│   ├── adr/                 # Architecture Decision Records
+│   └── roadmap/             # Phase-by-phase implementation plan (PHASES.md)
+└── docker-compose.yml       # Complete local microservices stack
+```
+
+---
+
+## ⚡ Getting Started
+
+### 1. Prerequisites
+- **Node.js**: v22 LTS or later
+- **Docker & Docker Compose**: Installed and running
+
+### 2. Start Full Stack (Services + Infrastructure)
+Run the entire microservice ecosystem (Postgres, Redis, Kafka + all 6 services) with a single command:
 
 ```bash
 docker compose up --build -d
 ```
 
-Default ports: API Gateway `3000`, Rider `3001`, Driver `3002`, Trip `3003`, Location
-`3004`, Dispatch `3005` (health check only — it's a pure Kafka consumer/producer, no
-public REST API), Postgres `5433` (not `5432`), Redis `6380` (not `6379`), Kafka `9094` —
-the non-default host ports avoid colliding with services already installed locally on
-this dev machine. Every port is overridable, e.g. `GATEWAY_HOST_PORT=3010 docker compose up -d`,
-if a default is already taken on your machine. Tear down with `docker compose down -v` —
-this removes the Postgres volume too, so migrations re-run from scratch on the next `up`.
+#### Exposed Service Ports:
+- **Web App**: `http://localhost:3000` (or `3008` if 3000 is occupied)
+- **API Gateway**: `http://localhost:3000`
+- **Rider Microservice**: `http://localhost:3001`
+- **Driver Microservice**: `http://localhost:3002`
+- **Trip Microservice**: `http://localhost:3003`
+- **Location Microservice**: `http://localhost:3004`
+- **PostgreSQL**: `localhost:5433` (Database: `rydtrip`)
+- **Redis**: `localhost:6380`
+- **Apache Kafka**: `localhost:9094`
+
+### 3. Run Frontend Web App Locally
+For active frontend UI development:
 
 ```bash
-# Register (password/email are required as of ADR-005) and log in
-curl -X POST localhost:3000/riders -H 'content-type: application/json' \
-  -d '{"name":"Priya Sharma","phone":"+919876543210","email":"priya@example.com","password":"correct-horse"}'
-curl -X POST localhost:3000/riders/login -H 'content-type: application/json' \
-  -d '{"identifier":"priya@example.com","password":"correct-horse"}'
+npm run dev --workspace=@rydtrip/web
 ```
 
-For active development on a single service without rebuilding a container each time,
-run it locally against the same Postgres: copy `services/<service>/.env.example` to
-`.env`, then `npm run start:dev --workspace=services/<service>` from the repo root
-(requires `docker compose up postgres -d` first). See
-[`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md) for what each phase actually built and
-its exit criteria.
+---
 
-## Kubernetes (Phase 9)
+## 🛡️ Reliability & Resilience
 
-All six app services also run on a local `kind` cluster via a single Helm chart —
-Postgres/Kafka/Redis stay in docker-compose. See
-[`infrastructure/kubernetes/README.md`](infrastructure/kubernetes/README.md) for how pods
-reach the docker-compose infra, and `infrastructure/kubernetes/scripts/up.sh` to bring the
-cluster up.
+- **Dead Letter Queue (DLQ)**: Every Kafka consumer retries failed events with exponential backoff and jitter. Persistent failures are parked on per-consumer Dead Letter Topics (`<group>.dlt`).
+- **Idempotent Consumers**: PostgreSQL `processed_events` tracking prevents duplicate event processing during network re-transmissions.
+- **Atomic Driver Lock**: Redis distributed locks guarantee that a ride request can never be accepted by multiple drivers simultaneously.
 
-## Reliability (Phase 8)
+---
 
-Every Kafka consumer retries transient failures (exponential backoff + jitter) and, once
-retries are exhausted, parks the message on a per-consumer-group Dead Letter Topic
-(`<group>.dlt`) instead of blocking the partition or dropping it silently. Idempotency
-guards against duplicate delivery separately (Postgres `processed_events` for Trip
-Service, a Redis key for Dispatch Service, which has no Postgres of its own). See
-[`docs/architecture/overview.md`](docs/architecture/overview.md#reliability-model-phase-8)
-for the full model.
+## 📄 License
 
-To inspect or replay whatever's sitting on a Dead Letter Topic (after fixing whatever
-made it fail):
-
-```bash
-npm run build --workspace=libraries/event-schema  # required once — the script imports it
-npm run replay-dlq -- --topic trip-service.dlt --dry-run
-npm run replay-dlq -- --topic trip-service.dlt
-```
-
-## License
-
-See [`LICENSE`](LICENSE).
+This project is licensed under the [MIT License](LICENSE).

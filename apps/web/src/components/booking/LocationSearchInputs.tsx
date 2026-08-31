@@ -55,7 +55,7 @@ function usePlaceSearch(query: string, active: boolean) {
  * anywhere, it only reads/writes the global useBookingStore. Real
  * search-as-you-type (Nominatim/OpenStreetMap, free, no API key) once 3+
  * characters are typed; the static "popular" list is just the empty-input
- * default, the same role Uber's "Saved places" list plays before you type.
+ * default, the same role RydTrip's "Saved places" list plays before you type.
  */
 export const LocationSearchInputs: React.FC = () => {
   const { pickup, setPickup, destination, setDestination, swapPickupDestination } = useBookingStore();
