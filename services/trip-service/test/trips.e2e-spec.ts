@@ -1,13 +1,27 @@
+import { execSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import request from 'supertest';
-import { randomUUID } from 'node:crypto';
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('Trip Service (e2e)', () => {
+  let container: StartedPostgreSqlContainer;
   let app: INestApplication;
 
   beforeAll(async () => {
+    container = await new PostgreSqlContainer('postgres:16-alpine')
+      .withDatabase('ridemesh_trips_test')
+      .withUsername('ridemesh')
+      .withPassword('ridemesh')
+      .start();
+
+    process.env.DATABASE_URL = container.getConnectionUri();
+
+    execSync('npx prisma migrate deploy', { env: { ...process.env }, stdio: 'inherit' });
+
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -16,6 +30,7 @@ describe('Trip Service (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
+    await container.stop();
   });
 
   const tripPayload = () => ({
@@ -29,12 +44,37 @@ describe('Trip Service (e2e)', () => {
     await request(app.getHttpServer()).get('/health/ready').expect(200);
   });
 
-  it('creates a trip which lands in MATCHING (REQUESTED -> MATCHING applied synchronously in Phase 2)', async () => {
+  it('creates a trip which lands in MATCHING (REQUESTED -> MATCHING applied synchronously in Phase 2/3)', async () => {
     const res = await request(app.getHttpServer()).post('/trips').send(tripPayload()).expect(201);
     expect(res.body.status).toBe('MATCHING');
 
     const getRes = await request(app.getHttpServer()).get(`/trips/${res.body.id}`).expect(200);
     expect(getRes.body.status).toBe('MATCHING');
+  });
+
+  it('persists across a fresh Prisma connection and records trip_events audit rows', async () => {
+    const createRes = await request(app.getHttpServer()).post('/trips').send(tripPayload()).expect(201);
+    const id = createRes.body.id;
+
+    await request(app.getHttpServer())
+      .post(`/trips/${id}/cancel`)
+      .send({ reason: 'RIDER_CANCELLED' })
+      .expect(201);
+
+    const secondModuleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const secondApp = secondModuleRef.createNestApplication();
+    await secondApp.init();
+
+    const getRes = await request(secondApp.getHttpServer()).get(`/trips/${id}`).expect(200);
+    expect(getRes.body.status).toBe('CANCELLED');
+    expect(getRes.body.cancellationReason).toBe('RIDER_CANCELLED');
+
+    await secondApp.close();
+
+    const prisma = app.get(PrismaService);
+    const events = await prisma.tripEvent.findMany({ where: { rideId: id } });
+    const eventTypes = events.map((event) => event.eventType).sort();
+    expect(eventTypes).toEqual(['ride.cancelled', 'ride.matching', 'ride.requested'].sort());
   });
 
   it('rejects a malformed create request with 400', async () => {

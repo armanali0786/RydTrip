@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { CancellationReason, Ride, RideStatus } from '@ridemesh/event-schema';
 import { CreateTripDto } from './dto/create-trip.dto';
@@ -10,64 +9,45 @@ export class TripsService {
   constructor(private readonly repository: TripsRepository) {}
 
   /**
-   * Phase 2 bridge: Dispatch Service (Phase 7) doesn't exist yet to consume
+   * Phase 2/3 bridge: Dispatch Service (Phase 7) doesn't exist yet to consume
    * `ride.requested` and asynchronously advance REQUESTED -> MATCHING, so we
-   * apply that same guarded transition synchronously here. This method's
-   * shape (persist at REQUESTED, then transition) mirrors what the real
-   * Kafka consumer will do in Phase 5+7.
+   * apply that same guarded transition synchronously here.
    */
-  create(dto: CreateTripDto): Ride {
-    const now = new Date().toISOString();
-    const ride: Ride = {
-      id: randomUUID(),
-      riderId: dto.riderId,
-      pickup: dto.pickup,
-      destination: dto.destination,
-      status: RideStatus.REQUESTED,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.repository.save(ride);
+  async create(dto: CreateTripDto): Promise<Ride> {
+    const ride = await this.repository.create(dto);
     return this.transitionTo(ride.id, RideStatus.MATCHING);
   }
 
-  findById(id: string): Ride {
-    const ride = this.repository.findById(id);
+  async findById(id: string): Promise<Ride> {
+    const ride = await this.repository.findById(id);
     if (!ride) {
       throw new NotFoundException(`Ride ${id} not found`);
     }
     return ride;
   }
 
-  markDriverArrived(id: string): Ride {
+  async markDriverArrived(id: string): Promise<Ride> {
     return this.transitionTo(id, RideStatus.DRIVER_ARRIVED);
   }
 
-  start(id: string): Ride {
+  async start(id: string): Promise<Ride> {
     return this.transitionTo(id, RideStatus.IN_PROGRESS);
   }
 
-  complete(id: string): Ride {
+  async complete(id: string): Promise<Ride> {
     return this.transitionTo(id, RideStatus.COMPLETED);
   }
 
-  cancel(id: string, reason: CancellationReason = CancellationReason.RIDER_CANCELLED): Ride {
-    const ride = this.findById(id);
+  async cancel(id: string, reason: CancellationReason = CancellationReason.RIDER_CANCELLED): Promise<Ride> {
+    const ride = await this.findById(id);
     this.guardTransition(ride.status, RideStatus.CANCELLED);
-    const updated: Ride = {
-      ...ride,
-      status: RideStatus.CANCELLED,
-      cancellationReason: reason,
-      updatedAt: new Date().toISOString(),
-    };
-    return this.repository.save(updated);
+    return this.repository.transition(id, RideStatus.CANCELLED, { cancellationReason: reason });
   }
 
-  private transitionTo(id: string, to: RideStatus): Ride {
-    const ride = this.findById(id);
+  private async transitionTo(id: string, to: RideStatus): Promise<Ride> {
+    const ride = await this.findById(id);
     this.guardTransition(ride.status, to);
-    const updated: Ride = { ...ride, status: to, updatedAt: new Date().toISOString() };
-    return this.repository.save(updated);
+    return this.repository.transition(id, to);
   }
 
   private guardTransition(from: RideStatus, to: RideStatus): void {

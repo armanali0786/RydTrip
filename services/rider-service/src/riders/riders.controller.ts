@@ -9,12 +9,12 @@ export class RidersController {
   constructor(private readonly ridersService: RidersService) {}
 
   @Post()
-  create(@Body() dto: CreateRiderDto) {
+  async create(@Body() dto: CreateRiderDto) {
     return this.ridersService.create(dto);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string) {
     return this.ridersService.findById(id);
   }
 }

@@ -1,0 +1,27 @@
+// Custom output path: npm workspaces hoist @prisma/client to the repo root,
+// which would let each service's `prisma generate` clobber the others'
+// generated types. Generating into a service-local folder and importing it
+// by relative path avoids that collision entirely.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Owned exclusively by Driver Service — see docs/adr/004-database-per-service.md.
+model Driver {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String   @unique
+  vehicleType String   @map("vehicle_type")
+  status      String   @default("OFFLINE")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("drivers")
+}

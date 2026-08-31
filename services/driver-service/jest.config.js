@@ -8,4 +8,6 @@ module.exports = {
   },
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   testEnvironment: 'node',
+  // Testcontainers pulls/starts a real Postgres per e2e run.
+  testTimeout: 60000,
 };

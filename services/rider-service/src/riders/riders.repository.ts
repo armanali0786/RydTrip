@@ -1,20 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { Rider } from '@ridemesh/event-schema';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateRiderDto } from './dto/create-rider.dto';
+import type { Rider as RiderRow } from '../../prisma-client';
 
-/**
- * In-memory store for Phase 2. Replaced by a Prisma-backed repository with
- * the same interface in Phase 3.
- */
+function toDomain(row: RiderRow): Rider {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 @Injectable()
 export class RidersRepository {
-  private readonly ridersById = new Map<string, Rider>();
+  constructor(private readonly prisma: PrismaService) {}
 
-  save(rider: Rider): Rider {
-    this.ridersById.set(rider.id, rider);
-    return rider;
+  async create(dto: CreateRiderDto): Promise<Rider> {
+    const row = await this.prisma.rider.create({
+      data: { name: dto.name, phone: dto.phone },
+    });
+    return toDomain(row);
   }
 
-  findById(id: string): Rider | undefined {
-    return this.ridersById.get(id);
+  async findById(id: string): Promise<Rider | null> {
+    const row = await this.prisma.rider.findUnique({ where: { id } });
+    return row ? toDomain(row) : null;
   }
 }

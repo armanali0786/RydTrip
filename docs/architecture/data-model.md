@@ -3,6 +3,12 @@
 PostgreSQL is the durable source of truth for business data (Phase 3 implements this
 via Prisma). Redis (Phase 6) and Kafka (Phase 5) hold no durable business state.
 
+**Physical ownership**: this document describes the logical entities and their
+relationships. Physically, each table lives in the database owned by the service that
+writes it — there is no single shared database and no cross-service foreign keys. See
+[ADR-004](../adr/004-database-per-service.md) for the full rationale and the exact
+service → database → table mapping.
+
 ## Entity relationship diagram
 
 ```mermaid

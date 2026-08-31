@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Rider } from '@ridemesh/event-schema';
 import { CreateRiderDto } from './dto/create-rider.dto';
@@ -8,20 +7,12 @@ import { RidersRepository } from './riders.repository';
 export class RidersService {
   constructor(private readonly repository: RidersRepository) {}
 
-  create(dto: CreateRiderDto): Rider {
-    const now = new Date().toISOString();
-    const rider: Rider = {
-      id: randomUUID(),
-      name: dto.name,
-      phone: dto.phone,
-      createdAt: now,
-      updatedAt: now,
-    };
-    return this.repository.save(rider);
+  async create(dto: CreateRiderDto): Promise<Rider> {
+    return this.repository.create(dto);
   }
 
-  findById(id: string): Rider {
-    const rider = this.repository.findById(id);
+  async findById(id: string): Promise<Rider> {
+    const rider = await this.repository.findById(id);
     if (!rider) {
       throw new NotFoundException(`Rider ${id} not found`);
     }

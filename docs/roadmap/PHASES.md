@@ -15,7 +15,7 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 | 0 | Environment + Engineering Foundation | 🟡 In progress (pending initial commit) | — |
 | 1 | System Design + PRD | 🟢 Done | 0 |
 | 2 | NestJS + Microservices Foundation | 🟢 Done | 1 |
-| 3 | PostgreSQL + Prisma | ⚪ Not started | 2 |
+| 3 | PostgreSQL + Prisma | 🟢 Done | 2 |
 | 4 | Docker + Local Infrastructure | ⚪ Not started | 3 |
 | 5 | Kafka + Event-Driven Architecture | ⚪ Not started | 4 |
 | 6 | Redis + GEO | ⚪ Not started | 5 |
@@ -118,16 +118,23 @@ Note: dev servers run via `ts-node-dev`, not `tsx` — `tsx`'s esbuild-based tra
 **Goal:** durable storage replaces in-memory state from Phase 2.
 
 Deliverables:
-- Prisma schema: `riders`, `drivers`, `rides`, `trip_events`, `processed_events`
-- Prisma Migrate initial migration
-- Repository layer per service using Prisma Client (swap in-memory stores)
-- Testcontainers-based integration tests (real Postgres in CI, not mocked)
-- Seed script for local dev data
+- [ADR-004](../adr/004-database-per-service.md): each service gets its own Postgres database and its own Prisma schema — no cross-service foreign keys. `rides.rider_id`/`driver_id` are plain UUID columns, validated at the application level, not by the database.
+- Prisma schema per service, each with its own service-local generated client (`services/*/prisma-client`, gitignored) to avoid npm workspaces hoisting collisions on `node_modules/@prisma/client`:
+  - `rider-service` → `ridemesh_riders` DB → `riders`
+  - `driver-service` → `ridemesh_drivers` DB → `drivers`
+  - `trip-service` → `ridemesh_trips` DB → `rides`, `trip_events`, `processed_events`
+- Prisma Migrate initial migration per service (`prisma/migrations/`)
+- Repository layer per service rewritten on Prisma Client, async throughout (controllers/services updated accordingly); Trip Service's repository also writes a `trip_events` audit row transactionally on every state transition
+- Testcontainers-based e2e tests (`@testcontainers/postgresql`) per service — a real Postgres container is started per test run and `prisma migrate deploy` is executed against it, so the tests prove the migration works from a clean database, not just that hand-migrated dev data happens to work
+- `prisma/seed.ts` per service (`npm run prisma:seed`)
+- Local dev Postgres: a single `docker run postgres:16-alpine` container (`ridemesh-postgres`, host port 5433) with three databases created inside it — formalized into `docker-compose.yml` in Phase 4
 
 Exit criteria:
-- [ ] All Phase 2 integration tests still pass against Postgres instead of in-memory
-- [ ] A service restart does not lose data
-- [ ] Migrations are reproducible from a clean database
+- [x] All Phase 2 integration tests still pass against Postgres instead of in-memory — 25 (driver) + 22 (trip) + 5 (rider) tests green, all against real Testcontainers Postgres
+- [x] A service restart does not lose data — verified for real: created a driver/rider/trip against the live dev Postgres, hard-killed (`kill -9`) all three service processes, restarted them fresh, and fetched the same records back successfully (not just the Jest "second app instance" proxy test, which also passes)
+- [x] Migrations are reproducible from a clean database — each e2e suite runs `prisma migrate deploy` against a brand-new Testcontainers Postgres before any test runs
+
+Note: `tsx`'s decorator-metadata problem from Phase 2 applies here too — `start:dev` stays on `ts-node-dev` for all Prisma-backed services.
 
 ---
 

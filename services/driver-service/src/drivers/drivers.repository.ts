@@ -1,20 +1,47 @@
 import { Injectable } from '@nestjs/common';
-import { Driver } from '@ridemesh/event-schema';
+import { Driver, DriverStatus } from '@ridemesh/event-schema';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateDriverDto } from './dto/create-driver.dto';
+import type { Driver as DriverRow } from '../../prisma-client';
 
-/**
- * In-memory store for Phase 2. Replaced by a Prisma-backed repository with
- * the same interface in Phase 3 — callers should not need to change.
- */
+function toDomain(row: DriverRow): Driver {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    vehicleType: row.vehicleType,
+    status: row.status as DriverStatus,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 @Injectable()
 export class DriversRepository {
-  private readonly driversById = new Map<string, Driver>();
+  constructor(private readonly prisma: PrismaService) {}
 
-  save(driver: Driver): Driver {
-    this.driversById.set(driver.id, driver);
-    return driver;
+  async create(dto: CreateDriverDto): Promise<Driver> {
+    const row = await this.prisma.driver.create({
+      data: {
+        name: dto.name,
+        phone: dto.phone,
+        vehicleType: dto.vehicleType,
+        status: DriverStatus.OFFLINE,
+      },
+    });
+    return toDomain(row);
   }
 
-  findById(id: string): Driver | undefined {
-    return this.driversById.get(id);
+  async findById(id: string): Promise<Driver | null> {
+    const row = await this.prisma.driver.findUnique({ where: { id } });
+    return row ? toDomain(row) : null;
+  }
+
+  async updateStatus(id: string, status: DriverStatus): Promise<Driver> {
+    const row = await this.prisma.driver.update({
+      where: { id },
+      data: { status },
+    });
+    return toDomain(row);
   }
 }

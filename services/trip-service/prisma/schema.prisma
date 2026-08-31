@@ -1,0 +1,63 @@
+// Custom output path: npm workspaces hoist @prisma/client to the repo root,
+// which would let each service's `prisma generate` clobber the others'
+// generated types. Generating into a service-local folder and importing it
+// by relative path avoids that collision entirely.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../prisma-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Owned exclusively by Trip Service — see docs/adr/004-database-per-service.md.
+// rider_id / driver_id are plain UUID columns, not DB foreign keys: the rows
+// they reference live in other services' databases.
+model Ride {
+  id                 String      @id @default(uuid())
+  riderId            String      @map("rider_id")
+  driverId           String?     @map("driver_id")
+  pickupLat          Float       @map("pickup_lat")
+  pickupLng          Float       @map("pickup_lng")
+  destinationLat     Float       @map("destination_lat")
+  destinationLng     Float       @map("destination_lng")
+  status             String
+  cancellationReason String?     @map("cancellation_reason")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  events             TripEvent[]
+
+  @@index([riderId, createdAt])
+  @@index([driverId])
+  @@index([status])
+  @@map("rides")
+}
+
+// Append-only audit trail — see docs/architecture/data-model.md for why this
+// is separate from `rides` (current state) rather than folded into it.
+model TripEvent {
+  id        String   @id @default(uuid())
+  rideId    String   @map("ride_id")
+  ride      Ride     @relation(fields: [rideId], references: [id])
+  eventType String   @map("event_type")
+  eventId   String   @map("event_id")
+  timestamp DateTime @default(now())
+  metadata  Json?
+
+  @@index([rideId, timestamp])
+  @@map("trip_events")
+}
+
+// Idempotency ledger for Trip Service's own Kafka consumption (Phase 8).
+// Unused by any code path until then — see ADR-004 on why this is
+// per-consumer-service rather than a single shared table.
+model ProcessedEvent {
+  eventId      String   @map("event_id")
+  consumerName String   @map("consumer_name")
+  processedAt  DateTime @default(now()) @map("processed_at")
+
+  @@id([eventId, consumerName])
+  @@map("processed_events")
+}
