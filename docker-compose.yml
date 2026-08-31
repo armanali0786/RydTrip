@@ -1,0 +1,99 @@
+name: ridemesh
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ridemesh
+      POSTGRES_PASSWORD: ridemesh
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ridemesh"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rider-service:
+    build:
+      context: .
+      dockerfile: services/rider-service/Dockerfile
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://ridemesh:ridemesh@postgres:5432/ridemesh_riders
+    ports:
+      - "${RIDER_HOST_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  driver-service:
+    build:
+      context: .
+      dockerfile: services/driver-service/Dockerfile
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://ridemesh:ridemesh@postgres:5432/ridemesh_drivers
+    ports:
+      - "${DRIVER_HOST_PORT:-3002}:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  trip-service:
+    build:
+      context: .
+      dockerfile: services/trip-service/Dockerfile
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://ridemesh:ridemesh@postgres:5432/ridemesh_trips
+    ports:
+      - "${TRIP_HOST_PORT:-3003}:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    environment:
+      PORT: 3000
+      RIDER_SERVICE_URL: http://rider-service:3001
+      DRIVER_SERVICE_URL: http://driver-service:3002
+      TRIP_SERVICE_URL: http://trip-service:3003
+    ports:
+      - "${GATEWAY_HOST_PORT:-3000}:3000"
+    depends_on:
+      rider-service:
+        condition: service_healthy
+      driver-service:
+        condition: service_healthy
+      trip-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

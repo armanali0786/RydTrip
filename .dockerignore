@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/prisma-client
+.git
+.env
+**/.env
+!**/.env.example
+*.log
+.vscode
+.idea

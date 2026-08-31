@@ -22,11 +22,11 @@ gate for starting the next.
 
 | Phase | Focus |
 |---|---|
-| 0 | Environment + engineering foundation *(current)* |
+| 0 | Environment + engineering foundation |
 | 1 | System design + PRD |
 | 2 | NestJS + microservices foundation |
 | 3 | PostgreSQL + Prisma |
-| 4 | Docker + local infrastructure |
+| 4 | Docker + local infrastructure *(current)* |
 | 5 | Kafka + event-driven architecture |
 | 6 | Redis + GEO |
 | 7 | Dispatch / matching engine |
@@ -72,9 +72,29 @@ destroyed. Nothing billable is left running between sessions.
 
 ## Getting started
 
-Phase 0 is environment setup only — no application code yet. See
-[`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md#phase-0--environment--engineering-foundation)
-for the exact deliverables and exit criteria.
+Bring up the whole local stack (Postgres + all four services) with:
+
+```bash
+docker compose up --build -d
+```
+
+Default ports: API Gateway `3000`, Rider `3001`, Driver `3002`, Trip `3003`, Postgres
+`5433` (not `5432` — avoids colliding with a locally installed Postgres). Every port is
+overridable, e.g. `GATEWAY_HOST_PORT=3010 docker compose up -d`, if a default is already
+taken on your machine. Tear down with `docker compose down -v` — this removes the
+Postgres volume too, so migrations re-run from scratch on the next `up`.
+
+```bash
+curl -X POST localhost:3000/riders -H 'content-type: application/json' \
+  -d '{"name":"Priya Sharma","phone":"+919876543210"}'
+```
+
+For active development on a single service without rebuilding a container each time,
+run it locally against the same Postgres: copy `services/<service>/.env.example` to
+`.env`, then `npm run start:dev --workspace=services/<service>` from the repo root
+(requires `docker compose up postgres -d` first). See
+[`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md) for what each phase actually built and
+its exit criteria.
 
 ## License
 

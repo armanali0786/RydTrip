@@ -16,7 +16,7 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 | 1 | System Design + PRD | 🟢 Done | 0 |
 | 2 | NestJS + Microservices Foundation | 🟢 Done | 1 |
 | 3 | PostgreSQL + Prisma | 🟢 Done | 2 |
-| 4 | Docker + Local Infrastructure | ⚪ Not started | 3 |
+| 4 | Docker + Local Infrastructure | 🟢 Done | 3 |
 | 5 | Kafka + Event-Driven Architecture | ⚪ Not started | 4 |
 | 6 | Redis + GEO | ⚪ Not started | 5 |
 | 7 | Dispatch / Matching Engine | ⚪ Not started | 6 |
@@ -143,13 +143,15 @@ Note: `tsx`'s decorator-metadata problem from Phase 2 applies here too — `star
 **Goal:** one command brings up the whole local stack.
 
 Deliverables:
-- Multi-stage `Dockerfile` per service (non-root user, minimal base image)
-- Root `docker-compose.yml`: Postgres, all NestJS services, network wiring
-- `.env.example` per service, secrets never committed
+- Multi-stage `Dockerfile` per service (`services/*/Dockerfile`): `deps` → `build` → `prod-deps` → `runtime`, non-root user (`ridemesh`), `node:22-alpine`. Prisma-backed services run `prisma migrate deploy` on boot (`npm run start:prod`) before starting the app, so a fresh container always ends up schema-current.
+- Root [`docker-compose.yml`](../../docker-compose.yml): one `postgres:16-alpine` instance (formalizing ADR-004's three-databases-one-instance local setup via [`infrastructure/postgres/init-databases.sql`](../../infrastructure/postgres/init-databases.sql)), all four NestJS services, healthchecks on every service (Postgres via `pg_isready`, Node services via an inline `http.get` check against `/health/ready` — no extra curl/wget binary needed in the minimal images), `depends_on: condition: service_healthy` wiring so `api-gateway` only starts once its three upstreams are actually healthy, not just started.
+- Host ports are overridable (`${GATEWAY_HOST_PORT:-3000}` etc.) — needed on this dev machine specifically because ports 3000 and 5432 are already held by unrelated local processes; default ports match each service's documented `.env.example`.
+- `.env.example` per service already existed from Phase 2/3; no secrets committed (verified — `.env` and `services/*/prisma-client` stay gitignored).
 
 Exit criteria:
-- [ ] `docker compose up` brings up every Phase 2/3 service healthy
-- [ ] `docker compose down -v` cleans up with no orphaned volumes/state assumptions
+- [x] `docker compose up` brings up every Phase 2/3 service healthy — verified from a **fully torn-down state** (`docker compose down -v` first), all five containers (`postgres`, `rider-service`, `driver-service`, `trip-service`, `api-gateway`) reach `(healthy)`, and a full create-rider → create-driver → create-trip flow through the containerized gateway succeeds
+- [x] `docker compose down -v` cleans up with no orphaned volumes/state assumptions — verified: after `down -v`, `docker ps -a`, `docker volume ls`, and `docker network ls` filtered on the project name all return empty
+- Bonus, not a stated exit criterion but worth recording: verified data survives a real `docker compose restart` of the three DB-backed containers (not just a Node process restart) — created a driver/trip, restarted the containers, fetched the same records back through the gateway successfully
 
 ---
 
