@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { Car, Loader2 } from 'lucide-react';
+import { Car, Loader2, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
-import { Button } from '../components/ui/Button';
 
 const DRIVER_VEHICLE_TYPES = ['SEDAN', 'SUV', 'HATCHBACK', 'AUTO', 'BIKE'] as const;
 
 interface LoginPageProps {
-  /** Locks the role tab when this page was reached via RequireAuth on a role-specific route. */
   requiredRole?: 'RIDER' | 'DRIVER';
 }
 
@@ -17,8 +15,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
 
   const [name, setName] = useState('');
-  const [identifier, setIdentifier] = useState(''); // login: email or phone
-  const [email, setEmail] = useState(''); // register
+  const [identifier, setIdentifier] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [vehicleType, setVehicleType] = useState<string>(DRIVER_VEHICLE_TYPES[0]);
@@ -39,33 +37,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
         });
       }
     } catch {
-      // error is already surfaced via the store's `error` field
+      // error handled in store
     }
   };
 
   return (
-    <div className="min-h-screen bg-canvas text-ink flex items-center justify-center font-text p-4">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center font-text p-4">
       <div className="w-full max-w-[420px] space-y-6">
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2">
-            <Car className="h-7 w-7 text-primary" />
-            <span className="font-display text-display-md text-ink">RydTrip</span>
+            <Car className="h-8 w-8 text-emerald-600" />
+            <span className="font-display text-3xl font-black text-slate-900 tracking-tight">RydTrip</span>
           </div>
-          <p className="text-body-sm text-body text-center">
-            {mode === 'LOGIN' ? 'Log in to continue' : 'Create an account to get started'}
+          <p className="text-sm font-medium text-slate-500 text-center">
+            {mode === 'LOGIN' ? 'Log in to continue your journey' : 'Create an account to get started'}
           </p>
         </div>
 
-        {/* Role toggle */}
-        <div className="flex items-center rounded-pill bg-canvas-soft p-1 border border-canvas-softer">
+        {/* Role toggle segment control */}
+        <div className="flex items-center rounded-2xl bg-slate-200/80 p-1.5 border border-slate-300/50">
           {(['RIDER', 'DRIVER'] as const).map((r) => (
             <button
               key={r}
               type="button"
               disabled={!!requiredRole}
               onClick={() => setRole(r)}
-              className={`flex-1 rounded-pill px-3 py-2 text-body-sm font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                role === r ? 'bg-canvas text-ink shadow-sm' : 'text-body hover:text-ink'
+              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-bold transition-all cursor-pointer ${
+                role === r
+                  ? 'bg-white text-slate-900 shadow-md'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-300/40'
               }`}
             >
               {r === 'RIDER' ? 'Rider' : 'Driver'}
@@ -73,15 +73,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
           ))}
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl bg-canvas p-6 shadow-card border border-canvas-soft">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-6 md:p-8 shadow-card border border-slate-100">
           {mode === 'REGISTER' && (
             <div className="space-y-1.5">
-              <label className="text-caption font-semibold text-mute uppercase">Full name</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Full name</label>
               <input
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-canvas-soft bg-canvas-soft/40 px-3.5 py-2.5 text-body-sm text-ink outline-none focus:border-primary"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                 placeholder="Priya Sharma"
               />
             </div>
@@ -89,45 +89,45 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
 
           {mode === 'LOGIN' ? (
             <div className="space-y-1.5">
-              <label className="text-caption font-semibold text-mute uppercase">Email or phone</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email or phone</label>
               <input
                 required
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                className="w-full rounded-lg border border-canvas-soft bg-canvas-soft/40 px-3.5 py-2.5 text-body-sm text-ink outline-none focus:border-primary"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                 placeholder="priya@example.com or +919876543210"
               />
             </div>
           ) : (
             <>
               <div className="space-y-1.5">
-                <label className="text-caption font-semibold text-mute uppercase">Email</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
                 <input
                   required
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-lg border border-canvas-soft bg-canvas-soft/40 px-3.5 py-2.5 text-body-sm text-ink outline-none focus:border-primary"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                   placeholder="priya@example.com"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-caption font-semibold text-mute uppercase">Phone</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phone</label>
                 <input
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full rounded-lg border border-canvas-soft bg-canvas-soft/40 px-3.5 py-2.5 text-body-sm text-ink outline-none focus:border-primary"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                   placeholder="+919876543210"
                 />
               </div>
               {role === 'DRIVER' && (
                 <div className="space-y-1.5">
-                  <label className="text-caption font-semibold text-mute uppercase">Vehicle type</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Vehicle type</label>
                   <select
                     value={vehicleType}
                     onChange={(e) => setVehicleType(e.target.value)}
-                    className="w-full rounded-lg border border-canvas-soft bg-canvas-soft/40 px-3.5 py-2.5 text-body-sm text-ink outline-none focus:border-primary"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
                   >
                     {DRIVER_VEHICLE_TYPES.map((v) => (
                       <option key={v} value={v}>
@@ -141,36 +141,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
           )}
 
           <div className="space-y-1.5">
-            <label className="text-caption font-semibold text-mute uppercase">Password</label>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Password</label>
             <input
               required
               type="password"
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-canvas-soft bg-canvas-soft/40 px-3.5 py-2.5 text-body-sm text-ink outline-none focus:border-primary"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all"
               placeholder="At least 6 characters"
             />
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-50 px-3.5 py-2.5 text-body-sm text-red-700 border border-red-100">
+            <div className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700 border border-red-100">
               {error}
             </div>
           )}
 
-          <Button type="submit" variant="primary" size="lg" fullWidth disabled={isLoading}>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-slate-900 hover:bg-emerald-600 text-white font-bold text-base shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-50"
+          >
             {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin text-white" />
             ) : mode === 'LOGIN' ? (
-              'Log in'
+              <>
+                <span>Log in</span>
+                <ArrowRight className="h-5 w-5" />
+              </>
             ) : (
-              'Create account'
+              <>
+                <span>Create account</span>
+                <ArrowRight className="h-5 w-5" />
+              </>
             )}
-          </Button>
+          </button>
         </form>
 
-        <p className="text-center text-body-sm text-body">
+        <p className="text-center text-sm font-medium text-slate-600">
           {mode === 'LOGIN' ? "Don't have an account? " : 'Already have an account? '}
           <button
             type="button"
@@ -178,7 +188,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
               clearError();
               setMode(mode === 'LOGIN' ? 'REGISTER' : 'LOGIN');
             }}
-            className="font-semibold text-ink underline underline-offset-4"
+            className="font-bold text-slate-900 hover:text-emerald-600 underline underline-offset-4 transition-colors cursor-pointer"
           >
             {mode === 'LOGIN' ? 'Sign up' : 'Log in'}
           </button>

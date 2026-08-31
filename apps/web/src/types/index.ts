@@ -69,6 +69,8 @@ export interface User {
   phone: string;
   email: string;
   role: 'RIDER' | 'DRIVER';
+  rating?: number;
+  avatar?: string;
 }
 
 export type WebSocketEventType =

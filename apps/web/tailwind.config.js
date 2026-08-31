@@ -22,8 +22,8 @@ export default {
         link: '#2563EB',
       },
       fontFamily: {
-        display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-        text: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        display: ['Gentona-Regular', 'Gentona', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        text: ['Gentona-Regular', 'Gentona', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       fontSize: {
         'display-xxl': ['52px', { lineHeight: '64px', fontWeight: '700' }],

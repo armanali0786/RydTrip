@@ -1,6 +1,23 @@
 @import 'leaflet/dist/leaflet.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* Fallback web font declaration for Gentona-Regular */
+@font-face {
+  font-family: 'Gentona-Regular';
+  src: local('Gentona-Regular'), local('Gentona Regular'), local('Gentona');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Gentona';
+  src: local('Gentona-Regular'), local('Gentona Regular'), local('Gentona');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,17 +26,15 @@
   body {
     background-color: #ffffff;
     color: #000000;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Gentona-Regular', 'Gentona', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
 
-  /* UberMove Display headlines styling */
   h1, h2, h3, .font-display {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Gentona-Regular', 'Gentona', 'Inter', sans-serif;
     font-feature-settings: "ss01" 1;
-    font-weight: 700;
     letter-spacing: normal;
   }
 }
@@ -33,7 +48,7 @@
   scrollbar-width: none;
 }
 
-/* Custom Leaflet Map styling to match Uber dark/clean aesthetic */
+/* Custom Leaflet Map styling */
 .leaflet-container {
   width: 100%;
   height: 100%;
