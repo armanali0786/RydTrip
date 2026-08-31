@@ -7,6 +7,7 @@ import { DriverPage } from './pages/DriverPage';
 import { DualViewPage } from './pages/DualViewPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { LoginPage } from './pages/LoginPage';
+import { ToastContainer } from './components/ui/ToastContainer';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +21,7 @@ const queryClient = new QueryClient({
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
+      <ToastContainer />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<MarketingHome />} />

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Car, Loader2, ArrowRight, CheckCircle2, Circle } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useToastStore } from '../stores/useToastStore';
 import { getRequiredDocuments, SUPPORTED_CITIES } from '../utils/driverDocuments';
 
 const DRIVER_VEHICLE_TYPES = ['SEDAN', 'SUV', 'HATCHBACK', 'AUTO', 'BIKE'] as const;
@@ -11,6 +12,7 @@ interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
   const { login, register, isLoading, error, clearError } = useAuthStore();
+  const { showToast } = useToastStore();
 
   const [role, setRole] = useState<'RIDER' | 'DRIVER'>(requiredRole ?? 'RIDER');
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
@@ -36,6 +38,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
     try {
       if (mode === 'LOGIN') {
         await login(role, identifier, password);
+        showToast(`Welcome back, ${useAuthStore.getState().user?.name ?? 'there'}!`, 'success');
       } else {
         await register(role, {
           name,
@@ -46,9 +49,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
             ? { vehicleType, city, licenseNumber, vehicleRegistrationNumber, insurancePolicyNumber, permitNumber: permitNumber || undefined }
             : {}),
         });
+        showToast(`Account created — welcome, ${useAuthStore.getState().user?.name ?? name}!`, 'success');
       }
-    } catch {
-      // error handled in store
+    } catch (err) {
+      // Inline banner below still shows the store's `error` — the toast is
+      // just the more visible, transient signal that something failed.
+      showToast(err instanceof Error ? err.message : 'Something went wrong', 'error');
     }
   };
 

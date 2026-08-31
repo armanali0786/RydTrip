@@ -9,6 +9,7 @@ import { useBookingStore } from '../stores/useBookingStore';
 import { useRideStore } from '../stores/useRideStore';
 import { useDriverStore } from '../stores/useDriverStore';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useToastStore } from '../stores/useToastStore';
 import { createRide, cancelRide } from '../api/rides';
 import { wsClient } from '../websocket/client';
 import { Layers, ArrowRight, Zap, RefreshCw } from 'lucide-react';
@@ -17,6 +18,7 @@ import { RequireAuth } from '../components/auth/RequireAuth';
 
 const DualViewPageContent: React.FC = () => {
   const { user } = useAuthStore();
+  const { showToast } = useToastStore();
   const { pickup, destination, selectedVehicle, paymentMethod, nearbyVehicle } = useBookingStore();
   const { activeRide, driverLocation, setActiveRide, updateRideStatus, assignDriver, updateDriverLocation, resetRide } =
     useRideStore();
@@ -64,17 +66,22 @@ const DualViewPageContent: React.FC = () => {
 
   const handleRiderSubmit = async () => {
     if (!pickup || !destination || !user) return;
-    const newRide = await createRide({
-      riderId: user.id,
-      riderName: user.name,
-      riderPhone: user.phone,
-      pickup,
-      destination,
-      vehicleType: selectedVehicle,
-      paymentMethod,
-      etaMinutes: nearbyVehicle?.option.eta ?? 5,
-    });
-    setActiveRide(newRide);
+    try {
+      const newRide = await createRide({
+        riderId: user.id,
+        riderName: user.name,
+        riderPhone: user.phone,
+        pickup,
+        destination,
+        vehicleType: selectedVehicle,
+        paymentMethod,
+        etaMinutes: nearbyVehicle?.option.eta ?? 5,
+      });
+      setActiveRide(newRide);
+      showToast('Ride requested! Finding your driver…', 'success');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Failed to request a ride', 'error');
+    }
   };
 
   return (

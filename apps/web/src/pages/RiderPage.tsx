@@ -12,6 +12,7 @@ import {
 import { useBookingStore } from '../stores/useBookingStore';
 import { useRideStore } from '../stores/useRideStore';
 import { useAuthStore } from '../stores/useAuthStore';
+import { useToastStore } from '../stores/useToastStore';
 import { createRide, cancelRide } from '../api/rides';
 import { wsClient } from '../websocket/client';
 import { ArrowLeft, X } from 'lucide-react';
@@ -30,6 +31,7 @@ export const RiderPage: React.FC = () => {
   const { activeRide, driverLocation, setActiveRide, updateRideStatus, assignDriver, updateDriverLocation, cancelActiveRide, resetRide } =
     useRideStore();
   const { user, isAuthenticated } = useAuthStore();
+  const { showToast } = useToastStore();
 
   const [step, setStep] = useState<'SELECT_RIDE' | 'ACTIVE_RIDE'>('SELECT_RIDE');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,8 +89,11 @@ export const RiderPage: React.FC = () => {
 
       setActiveRide(newRide);
       setStep('ACTIVE_RIDE');
+      showToast('Ride requested! Finding your driver…', 'success');
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'Failed to request a ride');
+      const message = e instanceof Error ? e.message : 'Failed to request a ride';
+      setSubmitError(message);
+      showToast(message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -108,8 +113,14 @@ export const RiderPage: React.FC = () => {
 
   const handleCancel = async () => {
     if (activeRide) {
-      await cancelRide(activeRide.id);
-      cancelActiveRide();
+      try {
+        await cancelRide(activeRide.id);
+        cancelActiveRide();
+        showToast('Ride cancelled', 'info');
+      } catch (e) {
+        showToast(e instanceof Error ? e.message : 'Failed to cancel the ride', 'error');
+        return;
+      }
     }
     setStep('SELECT_RIDE');
   };
