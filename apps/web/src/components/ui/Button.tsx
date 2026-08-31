@@ -3,7 +3,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'brand' | 'secondary' | 'subtle' | 'floating' | 'large-rounded' | 'tab-translucent';
+  variant?: 'primary' | 'secondary' | 'tertiary' | 'dark' | 'circular' | 'subtle';
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   children: React.ReactNode;
@@ -21,39 +21,35 @@ export const Button: React.FC<ButtonProps> = ({
     'inline-flex items-center justify-center font-semibold transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none select-none cursor-pointer';
 
   const variants = {
-    // Solid Slate Deep Button with bright text
+    // Primary Wise Lime-Green CTA (#9fe870) with 24px radius
     primary:
-      'bg-slate-900 text-white hover:bg-slate-800 active:bg-slate-950 rounded-pill shadow-md border border-slate-800',
-    
-    // Vibrant Emerald Brand Button (high energy ride CTA)
-    brand:
-      'bg-emerald-600 text-white hover:bg-emerald-500 active:bg-emerald-700 rounded-pill shadow-glow border border-emerald-500',
-    
-    // White secondary pill paired with primary dark
+      'bg-[#9fe870] text-[#0e0f0c] hover:bg-[#cdffad] active:bg-[#c5edab] rounded-xl font-bold shadow-sm',
+
+    // Secondary Sage-Tinted Pill
     secondary:
-      'bg-white text-slate-900 hover:bg-slate-100 active:bg-slate-200 rounded-pill border border-slate-200 shadow-sm font-bold',
-    
-    // Subtle gray pill
+      'bg-[#e8ebe6] text-[#0e0f0c] hover:bg-[#d8dcd5] active:bg-[#c8ccc5] rounded-xl font-semibold',
+
+    // Subtle variant alias
     subtle:
-      'bg-slate-100 text-slate-800 hover:bg-slate-200 active:bg-slate-300 rounded-pill border border-transparent font-medium',
-    
-    // Floating white pill with shadow
-    floating:
-      'bg-white text-slate-900 hover:bg-slate-50 rounded-pill shadow-pill-float border border-slate-200',
-    
-    // Large action button with rounded corners
-    'large-rounded':
-      'bg-slate-900 text-white hover:bg-slate-800 rounded-xl font-bold text-body-lg border border-transparent shadow-md',
-    
-    // Hero tab button
-    'tab-translucent':
-      'rounded-xl font-semibold text-body-md text-slate-700 hover:text-slate-900 transition-colors',
+      'bg-[#e8ebe6] text-[#0e0f0c] hover:bg-[#d8dcd5] active:bg-[#c8ccc5] rounded-xl font-semibold',
+
+    // Tertiary Outline White Pill with 1px ink border
+    tertiary:
+      'bg-white text-[#0e0f0c] border border-[#0e0f0c] hover:bg-[#f4f6f3] active:bg-[#e8ebe6] rounded-xl font-semibold',
+
+    // Dark Polarity-Flipped Pill (Wise near-black with green text)
+    dark:
+      'bg-[#0e0f0c] text-[#9fe870] hover:bg-[#1b1c18] active:bg-[#252722] rounded-xl font-bold',
+
+    // Circular Icon Button
+    circular:
+      'bg-white text-[#0e0f0c] border border-[#0e0f0c] hover:bg-[#e8ebe6] rounded-full p-3 font-semibold',
   };
 
   const sizes = {
-    sm: 'px-3.5 py-1.5 text-body-sm font-semibold',
-    md: 'px-5 py-2.5 text-body-md-strong font-semibold',
-    lg: 'px-6 py-3.5 text-body-lg font-bold',
+    sm: 'px-4 py-2 text-sm font-semibold',
+    md: 'px-6 py-3 text-base font-semibold',
+    lg: 'px-8 py-4 text-lg font-bold',
   };
 
   return (

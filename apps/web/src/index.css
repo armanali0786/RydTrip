@@ -1,22 +1,5 @@
 @import 'leaflet/dist/leaflet.css';
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-/* Fallback web font declaration for Gentona-Regular */
-@font-face {
-  font-family: 'Gentona-Regular';
-  src: local('Gentona-Regular'), local('Gentona Regular'), local('Gentona');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Gentona';
-  src: local('Gentona-Regular'), local('Gentona Regular'), local('Gentona');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -24,18 +7,20 @@
 
 @layer base {
   body {
-    background-color: #ffffff;
-    color: #000000;
-    font-family: 'Gentona-Regular', 'Gentona', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #e8ebe6;
+    color: #0e0f0c;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
   }
 
+  /* Wise Sans Display Typography Signature: Weight 900 */
   h1, h2, h3, .font-display {
-    font-family: 'Gentona-Regular', 'Gentona', 'Inter', sans-serif;
-    font-feature-settings: "ss01" 1;
-    letter-spacing: normal;
+    font-family: 'Inter', 'Manrope', sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: #0e0f0c;
   }
 }
 
@@ -52,8 +37,9 @@
 .leaflet-container {
   width: 100%;
   height: 100%;
-  background: #f3f3f3 !important;
+  background: #e8ebe6 !important;
   font-family: inherit;
+  border-radius: 24px;
 }
 
 .leaflet-control-attribution {
@@ -65,15 +51,15 @@
 @keyframes pulse-ring {
   0% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 0 rgba(159, 232, 112, 0.6);
   }
   70% {
     transform: scale(1.15);
-    box-shadow: 0 0 0 10px rgba(0, 0, 0, 0);
+    box-shadow: 0 0 0 12px rgba(159, 232, 112, 0);
   }
   100% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+    box-shadow: 0 0 0 0 rgba(159, 232, 112, 0);
   }
 }
 
