@@ -92,7 +92,7 @@ export class TripsRepository {
   async transition(
     id: string,
     to: RideStatus,
-    options?: { cancellationReason?: CancellationReason },
+    options?: { cancellationReason?: CancellationReason; driverId?: string },
   ): Promise<Ride> {
     const row = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.ride.update({
@@ -100,6 +100,7 @@ export class TripsRepository {
         data: {
           status: to,
           ...(options?.cancellationReason ? { cancellationReason: options.cancellationReason } : {}),
+          ...(options?.driverId ? { driverId: options.driverId } : {}),
         },
       });
       await tx.tripEvent.create({

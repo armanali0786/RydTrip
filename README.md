@@ -29,7 +29,7 @@ gate for starting the next.
 | 4 | Docker + local infrastructure |
 | 5 | Kafka + event-driven architecture |
 | 6 | Redis + GEO |
-| 7 | Dispatch / matching engine *(current)* |
+| 7 | Dispatch / matching engine |
 | 8 | Reliability + distributed systems |
 | 9 | Kubernetes (local) |
 | 10 | Observability |
@@ -72,16 +72,17 @@ destroyed. Nothing billable is left running between sessions.
 
 ## Getting started
 
-Bring up the whole local stack (Postgres, Redis, Kafka + all five services) with:
+Bring up the whole local stack (Postgres, Redis, Kafka + all six services) with:
 
 ```bash
 docker compose up --build -d
 ```
 
 Default ports: API Gateway `3000`, Rider `3001`, Driver `3002`, Trip `3003`, Location
-`3004`, Postgres `5433` (not `5432`), Redis `6380` (not `6379`), Kafka `9094` — the
-non-default host ports avoid colliding with services already installed locally on this
-dev machine. Every port is overridable, e.g. `GATEWAY_HOST_PORT=3010 docker compose up -d`,
+`3004`, Dispatch `3005` (health check only — it's a pure Kafka consumer/producer, no
+public REST API), Postgres `5433` (not `5432`), Redis `6380` (not `6379`), Kafka `9094` —
+the non-default host ports avoid colliding with services already installed locally on
+this dev machine. Every port is overridable, e.g. `GATEWAY_HOST_PORT=3010 docker compose up -d`,
 if a default is already taken on your machine. Tear down with `docker compose down -v` —
 this removes the Postgres volume too, so migrations re-run from scratch on the next `up`.
 

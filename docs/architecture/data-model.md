@@ -149,6 +149,16 @@ Composite primary key `(event_id, consumer_name)` is what makes a duplicate deli
 no-op: a second insert attempt for the same pair fails the uniqueness constraint, and
 the consumer treats that as "already handled."
 
+## Redis key space (Phase 6/7 — not durable, holds no business state)
+
+Owned per-service, same rule as Postgres (ADR-004) applied to Redis keys instead of tables.
+
+| Key | Owner | Purpose |
+|---|---|---|
+| `drivers:geo` | Location Service (writes), Dispatch Service (reads) | GEO sorted set of driver positions |
+| `driver:{id}:state` | Location Service | Hash of `lat`/`lng`/`updatedAt`; its `EXPIRE` is the heartbeat — gone means stale |
+| `driver:{id}:reservation` | Dispatch Service | `SET ... NX EX` reservation lock; value is the `rideId` that holds it |
+
 ## What's deliberately not modeled yet
 
 Payments, ratings, ride pooling, surge pricing, and multi-region sharding are out of

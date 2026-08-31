@@ -14,6 +14,15 @@ interface RideCancelledPayload {
   reason?: CancellationReason;
 }
 
+interface DriverAcceptedPayload {
+  rideId: string;
+  driverId: string;
+}
+
+interface DriverRejectedPayload {
+  rideId: string;
+}
+
 function isRideRequestedPayload(payload: unknown): payload is RideRequestedPayload {
   const p = payload as Partial<RideRequestedPayload> | null;
   return !!p && typeof p.rideId === 'string' && typeof p.riderId === 'string' && !!p.pickup && !!p.destination;
@@ -21,6 +30,16 @@ function isRideRequestedPayload(payload: unknown): payload is RideRequestedPaylo
 
 function isRideCancelledPayload(payload: unknown): payload is RideCancelledPayload {
   const p = payload as Partial<RideCancelledPayload> | null;
+  return !!p && typeof p.rideId === 'string';
+}
+
+function isDriverAcceptedPayload(payload: unknown): payload is DriverAcceptedPayload {
+  const p = payload as Partial<DriverAcceptedPayload> | null;
+  return !!p && typeof p.rideId === 'string' && typeof p.driverId === 'string';
+}
+
+function isDriverRejectedPayload(payload: unknown): payload is DriverRejectedPayload {
+  const p = payload as Partial<DriverRejectedPayload> | null;
   return !!p && typeof p.rideId === 'string';
 }
 
@@ -49,7 +68,12 @@ export class RideEventsConsumer implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     await this.consumer.connect();
-    await this.consumer.subscribe([KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_CANCELLED]);
+    await this.consumer.subscribe([
+      KAFKA_TOPICS.RIDE_REQUESTED,
+      KAFKA_TOPICS.RIDE_CANCELLED,
+      KAFKA_TOPICS.DRIVER_ACCEPTED,
+      KAFKA_TOPICS.DRIVER_REJECTED,
+    ]);
 
     await this.consumer.run(async (envelope) => {
       this.logger.log(
@@ -74,6 +98,18 @@ export class RideEventsConsumer implements OnModuleInit, OnModuleDestroy {
             return;
           }
           await this.tripsService.handleRideCancelled(envelope.payload.rideId, envelope.payload.reason);
+        } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_ACCEPTED) {
+          if (!isDriverAcceptedPayload(envelope.payload)) {
+            this.logger.error(`malformed ${KAFKA_TOPICS.DRIVER_ACCEPTED} payload, skipping eventId=${envelope.eventId}`);
+            return;
+          }
+          await this.tripsService.handleDriverAccepted(envelope.payload.rideId, envelope.payload.driverId);
+        } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_REJECTED) {
+          if (!isDriverRejectedPayload(envelope.payload)) {
+            this.logger.error(`malformed ${KAFKA_TOPICS.DRIVER_REJECTED} payload, skipping eventId=${envelope.eventId}`);
+            return;
+          }
+          await this.tripsService.handleDriverRejected(envelope.payload.rideId);
         }
       } catch (err) {
         this.logger.error(

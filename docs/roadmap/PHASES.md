@@ -19,7 +19,7 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 | 4 | Docker + Local Infrastructure | 🟢 Done | 3 |
 | 5 | Kafka + Event-Driven Architecture | 🟢 Done | 4 |
 | 6 | Redis + GEO | 🟢 Done | 5 |
-| 7 | Dispatch / Matching Engine | ⚪ Not started | 6 |
+| 7 | Dispatch / Matching Engine | 🟢 Done | 6 |
 | 8 | Reliability + Distributed Systems | ⚪ Not started | 7 |
 | 9 | Kubernetes (local) | ⚪ Not started | 8 |
 | 10 | Observability | ⚪ Not started | 9 |
@@ -193,13 +193,15 @@ Exit criteria:
 **Goal:** the core distributed-systems problem — race-free driver reservation.
 
 Deliverables:
-- `services/dispatch-service`: consumes `ride.requested`, queries Redis GEO, filters by availability, ranks candidates
-- Atomic reservation (Lua script or `SET ... NX` pattern) for `AVAILABLE → RESERVED`
-- Fallback to next candidate on reservation failure
-- Publishes `driver.reserved` / `driver.accepted` / `driver.rejected`
+- `services/dispatch-service`: consumes `ride.requested`, queries Redis GEO for nearby, non-stale, ranked candidates (reusing `libraries/redis-client`'s `DriverGeoIndex` directly — Dispatch talks to Redis itself, not through Location Service's HTTP API, per [overview.md](../architecture/overview.md)'s diagram).
+- Atomic reservation via `SET driver:{id}:reservation <rideId> NX EX <ttl>` (`libraries/redis-client`'s new `DriverReservationStore`) for `AVAILABLE → RESERVED` — a single atomic Redis command is sufficient (no Lua script needed) because Redis's single-threaded execution model already serializes concurrent `SET ... NX` calls against the same key.
+- Fallback to next ranked candidate whenever `tryReserve()` loses the race (candidate already reserved by a concurrent dispatch).
+- Publishes `driver.reserved` and `driver.accepted` on a won reservation (there's no human driver-accept/reject step yet — that's the frontend's own client-side simulation, not a real backend flow — so a won reservation is treated as accepted immediately), or `driver.rejected` with `NO_DRIVERS_AVAILABLE` once every candidate is exhausted.
+- Driver Service's Postgres `status` is synced `AVAILABLE → RESERVED` best-effort after a Redis win, not atomically with it — Redis is the hot-path source of truth for "who won" per [data-model.md](../architecture/data-model.md)'s note on the `status` index being "a fallback/audit path, not the hot path"; a failed sync is logged, not unwound (real cross-system compensation is Phase 8).
+- Trip Service now also consumes `driver.accepted` (→ `MATCHED` then `DRIVER_ARRIVING` in one guarded hop, exactly as `ride-state-machine.ts` anticipated) and `driver.rejected` (→ `CANCELLED`, reason `NO_DRIVERS_AVAILABLE`).
 
 Exit criteria:
-- [ ] Concurrency test: two simultaneous ride requests targeting the same sole nearby driver — exactly one wins, one gets a clean retry/failure (this is Failure Test 6 from the spec, pulled forward as an exit gate)
+- [x] Concurrency test: two simultaneous ride requests targeting the same sole nearby driver — exactly one wins, one gets a clean retry/failure (this is Failure Test 6 from the spec, pulled forward as an exit gate) — verified two ways: (1) `services/dispatch-service/test/dispatch.e2e-spec.ts` fires both via `Promise.all` against a real Redis instance and asserts one `driver.accepted` + one `driver.rejected`; (2) demoed live against the real service and real Kafka — both `ride.requested` events were consumed at the identical timestamp, one driver.accepted, the other lost the reservation race and fell back to driver.rejected with no more candidates
 
 ---
 

@@ -49,7 +49,15 @@ GEO writes; holds no Postgres data of its own (see [overview.md](overview.md)).
 | Method | Path | Purpose | Key response fields |
 |---|---|---|---|
 | `POST` | `/drivers/{driverId}/location` | Driver location ping — writes Redis GEO + refreshes the heartbeat TTL, publishes `driver.location.updated` | `driverId`, `status` (`ACCEPTED`) — returns immediately |
-| `GET` | `/drivers/nearby` | Nearby drivers via `GEOSEARCH`, ranked by distance (added to demonstrate the Phase 6 exit criteria; Dispatch Service becomes its real caller in Phase 7) | list of `{ driverId, lat, lng, distanceKm }`, ascending by distance |
+| `GET` | `/drivers/nearby` | Nearby drivers via `GEOSEARCH`, ranked by distance (added to demonstrate the Phase 6 exit criteria) | list of `{ driverId, lat, lng, distanceKm }`, ascending by distance |
+
+## Dispatch Service (Phase 7)
+
+Holds **no public HTTP API** — it's a pure Kafka consumer/producer (`ride.requested` in;
+`driver.reserved` / `driver.accepted` / `driver.rejected` out). It talks to Redis directly
+using the same `libraries/redis-client` `DriverGeoIndex` Location Service uses, rather than
+calling `GET /drivers/nearby` over HTTP — see [overview.md](overview.md). Only a health
+endpoint exists (`GET /health/live`, `GET /health/ready`).
 
 ## Trip Service
 

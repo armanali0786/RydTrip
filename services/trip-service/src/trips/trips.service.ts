@@ -27,6 +27,26 @@ export class TripsService {
     this.logger.log(`ride ${rideId} cancelled via event`);
   }
 
+  /**
+   * Consumes driver.accepted (Phase 7). MATCHED -> DRIVER_ARRIVING isn't
+   * independently triggerable (see ride-state-machine.ts) — both hops happen
+   * together as soon as Dispatch confirms a driver, which is what this event
+   * represents (there's no separate human accept/reject step yet).
+   */
+  async handleDriverAccepted(rideId: string, driverId: string): Promise<void> {
+    const ride = await this.findById(rideId);
+    this.guardTransition(ride.status, RideStatus.MATCHED);
+    await this.repository.transition(rideId, RideStatus.MATCHED, { driverId });
+    await this.transitionTo(rideId, RideStatus.DRIVER_ARRIVING);
+    this.logger.log(`ride ${rideId} matched with driver ${driverId}, advancing to DRIVER_ARRIVING`);
+  }
+
+  /** Consumes driver.rejected (Phase 7): Dispatch exhausted every candidate. */
+  async handleDriverRejected(rideId: string): Promise<void> {
+    await this.cancel(rideId, CancellationReason.NO_DRIVERS_AVAILABLE);
+    this.logger.log(`ride ${rideId} cancelled: no drivers available`);
+  }
+
   async findById(id: string): Promise<Ride> {
     const ride = await this.repository.findById(id);
     if (!ride) {

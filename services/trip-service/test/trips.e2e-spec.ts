@@ -137,6 +137,57 @@ describe('Trip Service (e2e)', () => {
     expect(res.body.cancellationReason).toBe('RIDER_CANCELLED');
   });
 
+  it('consumes driver.accepted and matches the ride, advancing to DRIVER_ARRIVING', async () => {
+    const rideId = randomUUID();
+    const driverId = randomUUID();
+    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideId), {
+      correlationId: randomUUID(),
+      key: rideId,
+    });
+    await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
+
+    await publisher.publish(
+      KAFKA_TOPICS.DRIVER_ACCEPTED,
+      KAFKA_TOPICS.DRIVER_ACCEPTED,
+      { rideId, driverId },
+      { correlationId: randomUUID(), key: rideId },
+    );
+
+    const res = await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'DRIVER_ARRIVING',
+    );
+    expect(res.body.driverId).toBe(driverId);
+  });
+
+  it('consumes driver.rejected and cancels the ride with NO_DRIVERS_AVAILABLE', async () => {
+    const rideId = randomUUID();
+    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideId), {
+      correlationId: randomUUID(),
+      key: rideId,
+    });
+    await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
+
+    await publisher.publish(
+      KAFKA_TOPICS.DRIVER_REJECTED,
+      KAFKA_TOPICS.DRIVER_REJECTED,
+      { rideId, reason: 'NO_DRIVERS_AVAILABLE' },
+      { correlationId: randomUUID(), key: rideId },
+    );
+
+    const res = await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'CANCELLED',
+    );
+    expect(res.body.cancellationReason).toBe('NO_DRIVERS_AVAILABLE');
+  });
+
   it('a malformed ride.requested payload is logged and skipped, not crashed on', async () => {
     await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, { not: 'a valid payload' }, {
       correlationId: randomUUID(),
