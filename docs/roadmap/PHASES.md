@@ -12,9 +12,9 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 
 | # | Phase | Status | Depends on |
 |---|-------|--------|------------|
-| 0 | Environment + Engineering Foundation | 🟢 In progress | — |
-| 1 | System Design + PRD | ⚪ Not started | 0 |
-| 2 | NestJS + Microservices Foundation | ⚪ Not started | 1 |
+| 0 | Environment + Engineering Foundation | 🟡 In progress (pending initial commit) | — |
+| 1 | System Design + PRD | 🟢 Done | 0 |
+| 2 | NestJS + Microservices Foundation | 🟢 Done | 1 |
 | 3 | PostgreSQL + Prisma | ⚪ Not started | 2 |
 | 4 | Docker + Local Infrastructure | ⚪ Not started | 3 |
 | 5 | Kafka + Event-Driven Architecture | ⚪ Not started | 4 |
@@ -64,16 +64,18 @@ Explicitly out of scope for this phase: any NestJS code, Docker Compose file, da
 **Goal:** the design is written down before code is written.
 
 Deliverables:
-- `docs/architecture/overview.md` — component diagram, request flow, ride lifecycle
-- `docs/architecture/data-model.md` — riders/drivers/rides/trip_events/processed_events
-- `docs/architecture/prd.md` — actors, functional requirements FR-001..FR-014
-- `docs/adr/003-rest-vs-events.md` — where sync REST is used vs async Kafka events
-- Sequence diagrams (Mermaid) for: ride request → dispatch → accept → trip lifecycle
+- [`docs/architecture/overview.md`](../architecture/overview.md) — component diagram, request flow, ride lifecycle, service responsibilities
+- [`docs/architecture/state-machines.md`](../architecture/state-machines.md) — full driver and ride state machines with transition tables
+- [`docs/architecture/data-model.md`](../architecture/data-model.md) — riders/drivers/rides/trip_events/processed_events
+- [`docs/architecture/api-contracts.md`](../architecture/api-contracts.md) — REST surface sketch, paths + verbs only
+- [`docs/architecture/prd.md`](../architecture/prd.md) — actors, FR-001..FR-014, NFRs, explicit out-of-scope list
+- [`docs/architecture/sequence-diagrams.md`](../architecture/sequence-diagrams.md) — ride request → dispatch → accept → trip lifecycle, incl. rejection and cancellation flows
+- [`docs/adr/003-rest-vs-events.md`](../adr/003-rest-vs-events.md) — where sync REST is used vs async Kafka events
 
 Exit criteria:
-- [ ] Every microservice in scope for Phases 2–7 has a one-paragraph responsibility statement
-- [ ] Ride and driver state machines are fully enumerated with valid transitions only
-- [ ] API contract sketch exists for Rider, Driver, Trip services (paths + verbs, no code)
+- [x] Every microservice in scope for Phases 2–7 has a one-paragraph responsibility statement — [overview.md](../architecture/overview.md)
+- [x] Ride and driver state machines are fully enumerated with valid transitions only — [state-machines.md](../architecture/state-machines.md)
+- [x] API contract sketch exists for Rider, Driver, Trip services (paths + verbs, no code) — [api-contracts.md](../architecture/api-contracts.md)
 
 ---
 
@@ -91,16 +93,23 @@ Scope — build in this order:
 Do not build Location or Dispatch service yet — those need Redis/Kafka (Phase 6/7).
 
 Deliverables:
-- Each service: health endpoints `/health/live`, `/health/ready`
-- Jest unit tests for state machine transition guards (invalid transitions rejected)
-- Supertest integration tests for each service's HTTP surface
-- OpenAPI spec per service (`@nestjs/swagger`)
-- Shared `libraries/event-schema` package scaffolded (types only, not wired to Kafka yet)
+- Each service (`services/rider-service`, `driver-service`, `trip-service`, `api-gateway`): health endpoints `/health/live`, `/health/ready`
+- Jest unit tests for state machine transition guards — exhaustive, not spot checks: [driver-state-machine.spec.ts](../../services/driver-service/src/drivers/driver-state-machine.spec.ts), [ride-state-machine.spec.ts](../../services/trip-service/src/trips/ride-state-machine.spec.ts)
+- Supertest e2e tests for each service's HTTP surface (`services/*/test/*.e2e-spec.ts`)
+- OpenAPI spec per service (`@nestjs/swagger`), served at `/docs`
+- Shared `libraries/@ridemesh/event-schema` package: `DriverStatus`/`RideStatus`/`CancellationReason` enums, `Rider`/`Driver`/`Ride` entity types, and the `EventEnvelope` shape (typed ahead of Phase 5, not wired to any transport yet)
+- API Gateway is a real reverse proxy (native `fetch`, no framework dependency) routing `/riders`, `/drivers`, `/trips` to their owning service and injecting `x-correlation-id`
+
+Design notes worth remembering for later phases:
+- Trip Service's `POST /trips` is a **Phase 2 bridge only** — it synchronously does what Dispatch (Phase 7) will do asynchronously via `ride.requested` consumption (create at `REQUESTED`, immediately guard-transition to `MATCHING`). It is not in [api-contracts.md](../architecture/api-contracts.md) and should be removed once Phase 7 lands.
+- Rider Service is registration-only in Phase 2, per this doc's original scope — ride creation moves to Rider Service once Kafka exists (Phase 5), matching [ADR-003](../adr/003-rest-vs-events.md).
 
 Exit criteria:
-- [ ] `npm run test` green across all four services
-- [ ] Can manually: create rider → create driver → create trip via curl/Postman, end to end, with all four services running locally via `npm run start:dev`
-- [ ] Invalid state transitions return 4xx, not 5xx
+- [x] `npm run test` green across all four services (74 tests total: driver-service 25, trip-service 21, rider-service 4, api-gateway 8, plus the shared library types)
+- [x] Can manually: create rider → create driver → create trip via curl/Postman, end to end, with all four services running locally via `npm run start:dev` — verified through the gateway on 2026-08-31
+- [x] Invalid state transitions return 4xx, not 5xx — verified: `AVAILABLE → ON_TRIP` and `MATCHING → DRIVER_ARRIVED` both return 409
+
+Note: dev servers run via `ts-node-dev`, not `tsx` — `tsx`'s esbuild-based transpilation does not reliably emit the `design:paramtypes` decorator metadata NestJS's constructor injection depends on, which surfaced as `this.service` being `undefined` at runtime despite a clean build and passing `ts-jest` tests (which use the real TypeScript compiler). `ts-node-dev` uses the real compiler and does not have this problem.
 
 ---
 
