@@ -1,4 +1,4 @@
-# 🚕 RydTrip
+<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-01" src="https://github.com/user-attachments/assets/057c304f-2b44-4f2c-b13a-8d3d28ab3c44" /># 🚕 RydTrip
 
 ![RydTrip Brand Banner](docs/images/rydtrip-banner.png)
 
@@ -9,13 +9,16 @@
 ## 📸 Visual Showcase
 
 ### 1. Rider Booking & Search Interface
-![RydTrip Hero Booking Interface](docs/images/hero-booking.png)
+![RydTrip Hero Booking Interface]
+<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-52-43" src="https://github.com/user-attachments/assets/40a83259-cbc4-4251-8013-c6efe014f263" />
 
 ### 2. Driver Partner Program & Real-Time Earnings
-![RydTrip Driver Partner Showcase](docs/images/driver-showcase.png)
+<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-01" src="https://github.com/user-attachments/assets/175d698e-5ded-4d2c-b413-1f3a170b1b82" />
+
 
 ### 3. Distributed Platform Features & Mobile Apps
-![RydTrip Features & Downloads](docs/images/features-download.png)
+![RydTrip Features & Downloads] <img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-08" src="https://github.com/user-attachments/assets/f30d0281-9478-447f-8e3a-cde765217edb" />
+oad.png)
 
 ---
 
