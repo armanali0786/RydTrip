@@ -1,5 +1,3 @@
-<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-01" src="https://github.com/user-attachments/assets/057c304f-2b44-4f2c-b13a-8d3d28ab3c44" /># 🚕 RydTrip
-
 
 
 **Production-grade, real-time distributed ride-hailing & dispatch platform** powered by an event-driven microservices architecture, low-latency geospatial matching, atomic driver reservation under high concurrency, and a fintech-grade responsive frontend UI.
