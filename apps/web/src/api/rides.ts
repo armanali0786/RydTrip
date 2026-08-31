@@ -1,4 +1,4 @@
-import { LocationPoint, Ride, RideStatus, VehicleOption, VehicleType } from '../types';
+import { LocationPoint, Ride, VehicleOption, VehicleType } from '../types';
 import { apiFetch } from './client';
 import { wsClient } from '../websocket/client';
 
@@ -10,6 +10,13 @@ export interface CreateRideRequest {
   destination: LocationPoint;
   vehicleType: VehicleType;
   paymentMethod: 'CASH' | 'MOCK_PAYMENT';
+}
+
+// Backend's real accepted shape (services/rider-service/src/rides/dto/*.ts):
+// POST /rides { riderId: uuid, pickup: {lat,lng}, destination: {lat,lng} } -> 202 { rideId, status }
+interface BackendCreateRideResponse {
+  rideId: string;
+  status: string;
 }
 
 export const VEHICLE_OPTIONS: VehicleOption[] = [
@@ -66,6 +73,15 @@ export function calculateDistanceKm(p1: LocationPoint, p2: LocationPoint): numbe
   return Math.round(R * c * 10) / 10 || 4.2;
 }
 
+// There is no real dispatch/matching backend yet (Phases 6-7 aren't built), so a
+// created ride can't be polled for a real match. The UI still relies on the
+// local WebSocket simulation layer (see websocket/client.ts) to drive the
+// REQUESTED -> MATCHING -> ... state transitions and hand the request to the
+// driver dashboard — that part is a deliberate stand-in for Dispatch Service,
+// not dummy data, and is broadcast below using the ride's real id/fare/rider
+// identity. What's real: the ride is actually created in Rider Service and
+// published as a Kafka ride.requested event, using the caller's authenticated
+// identity, not a fabricated one.
 export async function createRide(req: CreateRideRequest): Promise<Ride> {
   const distanceKm = calculateDistanceKm(req.pickup, req.destination);
   const durationMins = Math.round(distanceKm * 2.5);
@@ -73,9 +89,17 @@ export async function createRide(req: CreateRideRequest): Promise<Ride> {
   const baseOption = VEHICLE_OPTIONS.find((v) => v.type === req.vehicleType) || VEHICLE_OPTIONS[0];
   const calculatedFare = Math.round(baseOption.fare + distanceKm * 15);
 
-  const rideId = `ride_${Date.now().toString(36)}`;
-  const newRide: Ride = {
-    id: rideId,
+  const backendRes = await apiFetch<BackendCreateRideResponse>('/rides', {
+    method: 'POST',
+    body: JSON.stringify({
+      riderId: req.riderId,
+      pickup: { lat: req.pickup.latitude, lng: req.pickup.longitude },
+      destination: { lat: req.destination.latitude, lng: req.destination.longitude },
+    }),
+  });
+
+  const ride: Ride = {
+    id: backendRes.rideId,
     riderId: req.riderId,
     riderName: req.riderName,
     riderPhone: req.riderPhone,
@@ -92,44 +116,24 @@ export async function createRide(req: CreateRideRequest): Promise<Ride> {
     updatedAt: new Date().toISOString(),
   };
 
-  try {
-    const res = await apiFetch<Ride>('/rides', {
-      method: 'POST',
-      body: JSON.stringify(newRide),
-    });
-    return res;
-  } catch (e) {
-    // Local state fallback & broadcast to drivers
-    wsClient.send('ride.status.changed', {
-      rideId: newRide.id,
-      status: 'REQUESTED',
-      ride: newRide,
-    });
+  wsClient.send('ride.status.changed', { rideId: ride.id, status: 'REQUESTED', ride });
+  wsClient.send('driver.request.received', {
+    rideId: ride.id,
+    riderId: ride.riderId,
+    riderPhone: ride.riderPhone,
+    pickup: ride.pickup,
+    destination: ride.destination,
+    fare: ride.fare,
+    distanceKm: ride.distanceKm,
+    vehicleType: ride.vehicleType,
+    expiresInSeconds: 15,
+    riderName: ride.riderName,
+  });
 
-    wsClient.send('driver.request.received', {
-      rideId: newRide.id,
-      pickup: newRide.pickup,
-      destination: newRide.destination,
-      fare: newRide.fare,
-      distanceKm: newRide.distanceKm,
-      vehicleType: newRide.vehicleType,
-      expiresInSeconds: 15,
-      riderName: newRide.riderName,
-      riderRating: 4.9,
-    });
-
-    return newRide;
-  }
+  return ride;
 }
 
 export async function cancelRide(rideId: string): Promise<void> {
-  try {
-    await apiFetch(`/rides/${rideId}/cancel`, { method: 'POST' });
-  } catch (e) {
-    // broadcast event locally
-  }
-  wsClient.send('ride.status.changed', {
-    rideId,
-    status: 'CANCELLED',
-  });
+  await apiFetch(`/rides/${rideId}/cancel`, { method: 'POST' });
+  wsClient.send('ride.status.changed', { rideId, status: 'CANCELLED' });
 }

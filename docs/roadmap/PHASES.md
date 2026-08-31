@@ -249,15 +249,23 @@ Exit criteria:
 
 ## Phase 11 — Security
 
+**Note:** basic JWT authentication (rider/driver registration + login, gateway-level
+token verification) was pulled forward out of order and already exists — see
+[ADR-005](../adr/005-basic-auth-pulled-forward.md) for why and exactly what shipped
+early vs. what's still deferred to this phase.
+
 Deliverables:
-- JWT/OIDC auth at API Gateway, RBAC for rider/driver/operator roles
+- RBAC for rider/driver/operator roles (ADR-005 only checks "is this token valid",
+  not "is this role allowed to call this route")
+- OIDC upgrade path for the auth pulled forward in ADR-005
 - Non-root containers, dropped Linux capabilities, read-only root filesystem where possible
 - Kubernetes NetworkPolicies restricting cross-service traffic to what's needed
 - Dependency + container image scanning wired into the build (not yet CI — that's Phase 12)
-- Secrets via `.env`/local secret files locally, never committed; design ready for Secrets Manager in Phase 13
+- Real secret management for `JWT_SECRET` and friends (still a shared plaintext
+  local-dev value per ADR-005); design ready for Secrets Manager in Phase 13
 
 Exit criteria:
-- [ ] Unauthenticated/unauthorized requests are rejected at the gateway, not deeper in the stack
+- [x] Unauthenticated/unauthorized requests are rejected at the gateway, not deeper in the stack — verified via `services/api-gateway/test/proxy.e2e-spec.ts` (ADR-005); role-scoped RBAC enforcement is still open
 - [ ] `docs/security/threat-model.md` covers at minimum: double assignment, event replay, driver location spoofing
 
 ---

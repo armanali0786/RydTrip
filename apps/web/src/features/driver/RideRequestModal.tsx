@@ -59,7 +59,6 @@ export const RideRequestModal: React.FC = () => {
             <div className="font-display text-body-lg font-bold text-ink">
               {incomingRequest.vehicleType} • {incomingRequest.riderName}
             </div>
-            <div className="text-caption text-body">⭐ {incomingRequest.riderRating} Rider rating</div>
           </div>
 
           <div className="text-right">

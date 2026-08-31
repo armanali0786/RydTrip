@@ -52,7 +52,7 @@ describe('Rider Service (e2e)', () => {
   it('creates a rider and fetches it', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/riders')
-      .send({ name: 'Priya Sharma', phone: '+919876543210' })
+      .send({ name: 'Priya Sharma', phone: '+919876543210', email: 'priya@example.com', password: 'super-secret' })
       .expect(201);
 
     expect(createRes.body.id).toBeDefined();
@@ -66,7 +66,12 @@ describe('Rider Service (e2e)', () => {
   it('persists across a fresh Prisma connection (proves it is not in-memory)', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/riders')
-      .send({ name: 'Restart Check', phone: '+919999999999' })
+      .send({
+        name: 'Restart Check',
+        phone: '+919999999999',
+        email: 'restart-check@example.com',
+        password: 'super-secret',
+      })
       .expect(201);
 
     const secondModuleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -82,6 +87,13 @@ describe('Rider Service (e2e)', () => {
 
   it('rejects a malformed create request with 400', async () => {
     await request(app.getHttpServer()).post('/riders').send({ name: '' }).expect(400);
+  });
+
+  it('rejects registration with an invalid email with 400', async () => {
+    await request(app.getHttpServer())
+      .post('/riders')
+      .send({ name: 'Bad Email', phone: '+911234511111', email: 'not-an-email', password: 'super-secret' })
+      .expect(400);
   });
 
   it('returns 404 for an unknown rider', async () => {
@@ -102,7 +114,12 @@ describe('Rider Service (e2e)', () => {
   it('POST /rides publishes a ride.requested event carrying the same correlation id, and returns 202 immediately', async () => {
     const riderRes = await request(app.getHttpServer())
       .post('/riders')
-      .send({ name: 'Kafka Test Rider', phone: '+911234500000' })
+      .send({
+        name: 'Kafka Test Rider',
+        phone: '+911234500000',
+        email: 'kafka-test-rider@example.com',
+        password: 'super-secret',
+      })
       .expect(201);
     const riderId = riderRes.body.id;
     const correlationId = randomUUID();
@@ -175,4 +192,69 @@ describe('Rider Service (e2e)', () => {
 
     await consumer.disconnect();
   }, 30000);
+
+  it('registers a rider and logs in by phone with the same credentials, returning a bearer token', async () => {
+    await request(app.getHttpServer())
+      .post('/riders')
+      .send({
+        name: 'Login Test Rider',
+        phone: '+911234599999',
+        email: 'login-test-rider@example.com',
+        password: 'correct-horse',
+      })
+      .expect(201);
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/riders/login')
+      .send({ identifier: '+911234599999', password: 'correct-horse' })
+      .expect(200);
+
+    expect(typeof loginRes.body.accessToken).toBe('string');
+    expect(loginRes.body.rider.phone).toBe('+911234599999');
+    expect(loginRes.body.rider.email).toBe('login-test-rider@example.com');
+    expect(loginRes.body.rider.passwordHash).toBeUndefined();
+  });
+
+  it('logs in by email as well as phone', async () => {
+    await request(app.getHttpServer())
+      .post('/riders')
+      .send({
+        name: 'Email Login Rider',
+        phone: '+911234577777',
+        email: 'email-login-rider@example.com',
+        password: 'correct-horse',
+      })
+      .expect(201);
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/riders/login')
+      .send({ identifier: 'email-login-rider@example.com', password: 'correct-horse' })
+      .expect(200);
+
+    expect(loginRes.body.rider.email).toBe('email-login-rider@example.com');
+  });
+
+  it('rejects login with the wrong password with 401', async () => {
+    await request(app.getHttpServer())
+      .post('/riders')
+      .send({
+        name: 'Wrong Password Rider',
+        phone: '+911234588888',
+        email: 'wrong-password-rider@example.com',
+        password: 'correct-horse',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/riders/login')
+      .send({ identifier: '+911234588888', password: 'wrong-password' })
+      .expect(401);
+  });
+
+  it('rejects login for an unregistered identifier with 401', async () => {
+    await request(app.getHttpServer())
+      .post('/riders/login')
+      .send({ identifier: '+910000000000', password: 'whatever' })
+      .expect(401);
+  });
 });

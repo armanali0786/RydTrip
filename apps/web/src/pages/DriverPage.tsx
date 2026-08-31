@@ -2,13 +2,16 @@ import React, { useEffect } from 'react';
 import { Navbar } from '../components/ui/Navbar';
 import { RideMap } from '../components/map/RideMap';
 import { useDriverStore } from '../stores/useDriverStore';
+import { useAuthStore } from '../stores/useAuthStore';
 import { DriverTripCard } from '../features/driver/DriverTripCard';
 import { RideRequestModal } from '../features/driver/RideRequestModal';
 import { Button } from '../components/ui/Button';
 import { wsClient } from '../websocket/client';
 import { ShieldCheck, Navigation, DollarSign, Award, RefreshCw } from 'lucide-react';
+import { RequireAuth } from '../components/auth/RequireAuth';
 
-export const DriverPage: React.FC = () => {
+const DriverPageContent: React.FC = () => {
+  const { user } = useAuthStore();
   const {
     status,
     toggleOnline,
@@ -62,7 +65,7 @@ export const DriverPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-canvas-soft pb-4">
               <div>
                 <span className="font-display text-display-md text-ink">Driver Dashboard</span>
-                <div className="text-caption text-body">Rahul Sharma • Toyota Camry</div>
+                <div className="text-caption text-body">{user?.name}</div>
               </div>
 
               <button
@@ -130,3 +133,9 @@ export const DriverPage: React.FC = () => {
     </div>
   );
 };
+
+export const DriverPage: React.FC = () => (
+  <RequireAuth role="DRIVER">
+    <DriverPageContent />
+  </RequireAuth>
+);

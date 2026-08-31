@@ -8,12 +8,15 @@ import { RideRequestModal } from '../features/driver/RideRequestModal';
 import { useBookingStore } from '../stores/useBookingStore';
 import { useRideStore } from '../stores/useRideStore';
 import { useDriverStore } from '../stores/useDriverStore';
+import { useAuthStore } from '../stores/useAuthStore';
 import { createRide, cancelRide } from '../api/rides';
 import { wsClient } from '../websocket/client';
 import { Layers, ArrowRight, Zap, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { RequireAuth } from '../components/auth/RequireAuth';
 
-export const DualViewPage: React.FC = () => {
+const DualViewPageContent: React.FC = () => {
+  const { user } = useAuthStore();
   const { pickup, destination, selectedVehicle, paymentMethod } = useBookingStore();
   const { activeRide, driverLocation, setActiveRide, updateRideStatus, assignDriver, updateDriverLocation, resetRide } =
     useRideStore();
@@ -60,11 +63,11 @@ export const DualViewPage: React.FC = () => {
   }, [activeRide, driverStatus, activeTrip, updateRideStatus, assignDriver, updateDriverLocation, setIncomingRequest]);
 
   const handleRiderSubmit = async () => {
-    if (!pickup || !destination) return;
+    if (!pickup || !destination || !user) return;
     const newRide = await createRide({
-      riderId: 'rider_arman_01',
-      riderName: 'Arman Ali',
-      riderPhone: '+91 98765 43210',
+      riderId: user.id,
+      riderName: user.name,
+      riderPhone: user.phone,
       pickup,
       destination,
       vehicleType: selectedVehicle,
@@ -189,3 +192,13 @@ export const DualViewPage: React.FC = () => {
     </div>
   );
 };
+
+// Any authenticated account can open this sandbox, but the rider panel's
+// "Confirm Ride" only succeeds against the real backend when logged in as a
+// rider — Rider Service validates the id against its own riders table
+// (ADR-004: no cross-service foreign keys), and a driver id doesn't live there.
+export const DualViewPage: React.FC = () => (
+  <RequireAuth>
+    <DualViewPageContent />
+  </RequireAuth>
+);

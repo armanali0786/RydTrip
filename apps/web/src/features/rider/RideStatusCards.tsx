@@ -3,6 +3,16 @@ import { Loader2, Phone, ShieldAlert, Star, CheckCircle2, Car, Navigation, Alert
 import { useRideStore } from '../../stores/useRideStore';
 import { Button } from '../../components/ui/Button';
 
+function initials(name: string | undefined): string {
+  if (!name) return '?';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+}
+
 export const FindingDriverCard: React.FC<{ onCancel: () => void }> = ({ onCancel }) => {
   const { activeRide } = useRideStore();
 
@@ -60,24 +70,26 @@ export const DriverMatchedCard: React.FC<{ onCancel: () => void }> = ({ onCancel
       {/* Driver & Vehicle Details */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <img
-            src={driver?.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80'}
-            alt={driver?.name}
-            className="h-14 w-14 rounded-full object-cover border-2 border-primary"
-          />
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-primary bg-canvas-soft text-body-md font-bold text-ink">
+            {initials(driver?.name)}
+          </div>
           <div>
-            <h3 className="font-display text-body-lg text-ink font-bold">{driver?.name || 'Rahul Sharma'}</h3>
-            <div className="flex items-center gap-1.5 text-body-sm text-body">
-              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-              <span className="font-semibold">{driver?.rating || 4.9}</span>
-              <span>({driver?.totalTrips || 1240} trips)</span>
-            </div>
+            <h3 className="font-display text-body-lg text-ink font-bold">{driver?.name || 'Searching…'}</h3>
+            {driver?.rating != null && (
+              <div className="flex items-center gap-1.5 text-body-sm text-body">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                <span className="font-semibold">{driver.rating}</span>
+                {driver.totalTrips != null && <span>({driver.totalTrips} trips)</span>}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="text-right">
-          <div className="font-display text-body-lg font-bold text-ink">{driver?.licensePlate || 'TS 07 EQ 9999'}</div>
-          <div className="text-caption text-body">{driver?.vehicleModel || 'Toyota Camry'}</div>
+          {driver?.licensePlate && (
+            <div className="font-display text-body-lg font-bold text-ink">{driver.licensePlate}</div>
+          )}
+          <div className="text-caption text-body">{driver?.vehicleModel || '—'}</div>
         </div>
       </div>
 
@@ -153,7 +165,7 @@ export const TripCompletedCard: React.FC<{ onNewRide: () => void }> = ({ onNewRi
 
       {/* Driver Rating Widget */}
       <div className="pt-2">
-        <div className="text-body-sm font-semibold text-ink mb-2">Rate your driver ({activeRide?.driver?.name || 'Rahul'})</div>
+        <div className="text-body-sm font-semibold text-ink mb-2">Rate your driver ({activeRide?.driver?.name || 'your driver'})</div>
         <div className="flex justify-center gap-2">
           {[1, 2, 3, 4, 5].map((star) => (
             <button key={star} type="button" className="text-amber-400 hover:scale-110 transition-transform">

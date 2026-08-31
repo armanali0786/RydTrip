@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { DriverStatus, LocationPoint, Ride, RideRequestPayload } from '../types';
+import { useAuthStore } from './useAuthStore';
 import { wsClient } from '../websocket/client';
 
 interface DriverStoreState {
@@ -21,6 +22,8 @@ interface DriverStoreState {
   completeTrip: () => void;
 }
 
+// Real GPS isn't wired up yet (no device geolocation call) — this is only a
+// starting map center, not a claim about where any specific driver is.
 export const INITIAL_DRIVER_LOCATION: LocationPoint = {
   latitude: 17.442,
   longitude: 78.385,
@@ -33,8 +36,10 @@ export const useDriverStore = create<DriverStoreState>((set, get) => ({
   currentLocation: INITIAL_DRIVER_LOCATION,
   incomingRequest: null,
   activeTrip: null,
-  todaysTripsCount: 8,
-  todaysEarnings: 2840,
+  // No trip-stats aggregation endpoint exists yet — start at zero and accrue
+  // for real as completeTrip() fires, rather than pretending a day already happened.
+  todaysTripsCount: 0,
+  todaysEarnings: 0,
 
   setStatus: (status) => set({ status }),
 
@@ -45,9 +50,10 @@ export const useDriverStore = create<DriverStoreState>((set, get) => ({
 
   setCurrentLocation: (loc) => {
     set({ currentLocation: loc });
-    if (get().status === 'ONLINE') {
+    const driver = useAuthStore.getState().user;
+    if (get().status === 'ONLINE' && driver) {
       wsClient.send('driver.location.updated', {
-        driverId: 'driver_rahul_01',
+        driverId: driver.id,
         location: loc,
       });
     }
@@ -57,13 +63,14 @@ export const useDriverStore = create<DriverStoreState>((set, get) => ({
 
   acceptRideRequest: () => {
     const req = get().incomingRequest;
-    if (!req) return;
+    const driver = useAuthStore.getState().user;
+    if (!req || !driver) return;
 
     const newTrip: Ride = {
       id: req.rideId,
-      riderId: 'rider_arman_01',
+      riderId: req.riderId,
       riderName: req.riderName,
-      riderPhone: '+91 98765 43210',
+      riderPhone: req.riderPhone,
       vehicleType: req.vehicleType,
       pickup: req.pickup,
       destination: req.destination,
@@ -76,15 +83,13 @@ export const useDriverStore = create<DriverStoreState>((set, get) => ({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       driver: {
-        id: 'driver_rahul_01',
-        name: 'Rahul Sharma',
-        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        rating: 4.88,
-        totalTrips: 1240,
-        vehicleModel: 'Toyota Camry Hybrid',
-        vehicleColor: 'Black',
-        licensePlate: 'TS 07 EQ 9999',
-        phone: '+91 91234 56789',
+        id: driver.id,
+        name: driver.name,
+        phone: driver.phone,
+        // Vehicle make/model/color/plate and rating aren't tracked by
+        // Driver Service yet (schema only has a vehicleType enum) — no
+        // specifics to show beyond that.
+        vehicleModel: 'Vehicle details not yet tracked',
         currentLocation: get().currentLocation,
       },
     };

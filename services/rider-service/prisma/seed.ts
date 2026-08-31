@@ -1,17 +1,29 @@
+import { hashSync } from 'bcryptjs';
 import { PrismaClient } from '../prisma-client';
 
 const prisma = new PrismaClient();
+const DEMO_PASSWORD_HASH = hashSync('rydtrip123', 10);
 
 async function main(): Promise<void> {
   await prisma.rider.upsert({
     where: { phone: '+919876543210' },
     update: {},
-    create: { name: 'Priya Sharma', phone: '+919876543210' },
+    create: {
+      name: 'Priya Sharma',
+      phone: '+919876543210',
+      email: 'priya@example.com',
+      passwordHash: DEMO_PASSWORD_HASH,
+    },
   });
   await prisma.rider.upsert({
     where: { phone: '+919876500000' },
     update: {},
-    create: { name: 'Demo Rider', phone: '+919876500000' },
+    create: {
+      name: 'Demo Rider',
+      phone: '+919876500000',
+      email: 'demo.rider@rydtrip.com',
+      passwordHash: DEMO_PASSWORD_HASH,
+    },
   });
   // eslint-disable-next-line no-console
   console.log('rider-service: seed complete');

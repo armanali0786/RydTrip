@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsIn, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export const VEHICLE_TYPES = ['SEDAN', 'SUV', 'HATCHBACK', 'AUTO', 'BIKE'] as const;
 
@@ -13,6 +13,15 @@ export class CreateDriverDto {
   @IsString()
   @IsNotEmpty()
   phone!: string;
+
+  @ApiProperty({ example: 'asha@example.com' })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ example: 'a-strong-password', minLength: 6 })
+  @IsString()
+  @MinLength(6)
+  password!: string;
 
   @ApiProperty({ enum: VEHICLE_TYPES, example: 'SEDAN' })
   @IsString()

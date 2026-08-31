@@ -6,6 +6,7 @@ import { RiderPage } from './pages/RiderPage';
 import { DriverPage } from './pages/DriverPage';
 import { DualViewPage } from './pages/DualViewPage';
 import { HistoryPage } from './pages/HistoryPage';
+import { LoginPage } from './pages/LoginPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,7 @@ export const App: React.FC = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<MarketingHome />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/rider" element={<RiderPage />} />
           <Route path="/driver" element={<DriverPage />} />
           <Route path="/dual" element={<DualViewPage />} />

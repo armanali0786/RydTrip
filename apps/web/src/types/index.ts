@@ -33,12 +33,13 @@ export interface VehicleOption {
 export interface DriverInfo {
   id: string;
   name: string;
-  avatar: string;
-  rating: number;
-  totalTrips: number;
+  // Not yet tracked by any backend service (no ratings/trip-count aggregation,
+  // no vehicle color/plate on file) — omit rather than fabricate.
+  rating?: number;
+  totalTrips?: number;
   vehicleModel: string;
-  vehicleColor: string;
-  licensePlate: string;
+  vehicleColor?: string;
+  licensePlate?: string;
   phone: string;
   currentLocation: LocationPoint;
 }
@@ -65,11 +66,9 @@ export interface Ride {
 export interface User {
   id: string;
   name: string;
-  email: string;
   phone: string;
+  email: string;
   role: 'RIDER' | 'DRIVER';
-  rating: number;
-  avatar: string;
 }
 
 export type WebSocketEventType =
@@ -92,6 +91,8 @@ export interface WebSocketEvent<T = any> {
 
 export interface RideRequestPayload {
   rideId: string;
+  riderId: string;
+  riderPhone: string;
   pickup: LocationPoint;
   destination: LocationPoint;
   fare: number;
@@ -99,5 +100,4 @@ export interface RideRequestPayload {
   vehicleType: VehicleType;
   expiresInSeconds: number;
   riderName: string;
-  riderRating: number;
 }

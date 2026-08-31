@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CreateDriverDto } from './dto/create-driver.dto';
+import { LoginDriverDto } from './dto/login-driver.dto';
 import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
 import { DriversService } from './drivers.service';
 
@@ -12,6 +13,12 @@ export class DriversController {
   @Post()
   async create(@Body() dto: CreateDriverDto) {
     return this.driversService.create(dto);
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() dto: LoginDriverDto) {
+    return this.driversService.login(dto);
   }
 
   @Get(':id')

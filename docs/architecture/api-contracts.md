@@ -20,7 +20,8 @@ supply one, per the event envelope defined in [ADR-003](../adr/003-rest-vs-event
 
 | Method | Path | Purpose | Key response fields |
 |---|---|---|---|
-| `POST` | `/riders` | Register a rider | `id`, `name`, `phone` |
+| `POST` | `/riders` | Register a rider (requires `email` + `password`, ADR-005) | `id`, `name`, `phone`, `email` |
+| `POST` | `/riders/login` | Log in with `identifier` (email or phone) + `password` (ADR-005) | `accessToken`, rider fields |
 | `GET` | `/riders/{riderId}` | Fetch rider profile | rider fields |
 | `POST` | `/rides` | Request a ride | `rideId`, `status` (`MATCHING`) — returns immediately, does not wait for a match |
 | `GET` | `/rides/{rideId}` | Fetch current ride status | ride fields incl. `status`, `driverId` if matched |
@@ -31,7 +32,8 @@ supply one, per the event envelope defined in [ADR-003](../adr/003-rest-vs-event
 
 | Method | Path | Purpose | Key response fields |
 |---|---|---|---|
-| `POST` | `/drivers` | Register a driver | `id`, `name`, `phone`, `vehicleType`, `status` (`OFFLINE`) |
+| `POST` | `/drivers` | Register a driver (requires `email` + `password`, ADR-005) | `id`, `name`, `phone`, `email`, `vehicleType`, `status` (`OFFLINE`) |
+| `POST` | `/drivers/login` | Log in with `identifier` (email or phone) + `password` (ADR-005) | `accessToken`, driver fields |
 | `GET` | `/drivers/{driverId}` | Fetch driver profile | driver fields |
 | `PATCH` | `/drivers/{driverId}/status` | Explicit status transition (online/offline/suspend/reinstate) | updated `status`; `409` on an invalid transition (see [state-machines.md](state-machines.md)) |
 
@@ -59,7 +61,8 @@ transition from the current state returns `409 Conflict`, not `500`.
 | `404` | Referenced entity (rider/driver/ride) doesn't exist |
 | `409` | Requested transition is not valid from the entity's current state |
 | `429` | Rate limit exceeded (Gateway-enforced) |
-| `401` / `403` | Missing/invalid auth, or insufficient role (enforced starting Phase 11) |
+| `401` | Missing/invalid/expired bearer token (enforced at the Gateway since ADR-005) |
+| `403` | Valid token, insufficient role (RBAC — Phase 11, not yet enforced) |
 
 ## Health endpoints (every service)
 

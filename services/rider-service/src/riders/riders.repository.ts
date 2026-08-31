@@ -9,6 +9,7 @@ function toDomain(row: RiderRow): Rider {
     id: row.id,
     name: row.name,
     phone: row.phone,
+    email: row.email,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -18,9 +19,9 @@ function toDomain(row: RiderRow): Rider {
 export class RidersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateRiderDto): Promise<Rider> {
+  async create(dto: CreateRiderDto, passwordHash: string): Promise<Rider> {
     const row = await this.prisma.rider.create({
-      data: { name: dto.name, phone: dto.phone },
+      data: { name: dto.name, phone: dto.phone, email: dto.email, passwordHash },
     });
     return toDomain(row);
   }
@@ -28,5 +29,9 @@ export class RidersRepository {
   async findById(id: string): Promise<Rider | null> {
     const row = await this.prisma.rider.findUnique({ where: { id } });
     return row ? toDomain(row) : null;
+  }
+
+  async findRowByIdentifier(identifier: string): Promise<RiderRow | null> {
+    return this.prisma.rider.findFirst({ where: { OR: [{ phone: identifier }, { email: identifier }] } });
   }
 }

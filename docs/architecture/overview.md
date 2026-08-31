@@ -35,7 +35,10 @@ graph TD
 
 **API Gateway** — single entry point for clients. Owns authentication, authorization,
 request routing to the correct downstream service, request validation, rate limiting,
-and correlation ID injection. Holds no domain state of its own.
+and correlation ID injection. Holds no domain state of its own. Authentication is a
+stateless JWT check (registration/login handled by Rider/Driver Service, verification
+here) pulled forward from Phase 11 — see [ADR-005](../adr/005-basic-auth-pulled-forward.md)
+for what's real today vs. still deferred (RBAC, OIDC).
 
 **Rider Service** — owns rider profiles and ride creation/cancellation/history. On
 `POST /rides` it validates the request, persists a `REQUESTED` ride, and publishes

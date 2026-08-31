@@ -14,13 +14,15 @@ datasource db {
 
 // Owned exclusively by Driver Service — see docs/adr/004-database-per-service.md.
 model Driver {
-  id          String   @id @default(uuid())
-  name        String
-  phone       String   @unique
-  vehicleType String   @map("vehicle_type")
-  status      String   @default("OFFLINE")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  name         String
+  phone        String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  vehicleType  String   @map("vehicle_type")
+  status       String   @default("OFFLINE")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@index([status])
   @@map("drivers")

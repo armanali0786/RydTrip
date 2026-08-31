@@ -9,6 +9,7 @@ function toDomain(row: DriverRow): Driver {
     id: row.id,
     name: row.name,
     phone: row.phone,
+    email: row.email,
     vehicleType: row.vehicleType,
     status: row.status as DriverStatus,
     createdAt: row.createdAt.toISOString(),
@@ -20,11 +21,13 @@ function toDomain(row: DriverRow): Driver {
 export class DriversRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateDriverDto): Promise<Driver> {
+  async create(dto: CreateDriverDto, passwordHash: string): Promise<Driver> {
     const row = await this.prisma.driver.create({
       data: {
         name: dto.name,
         phone: dto.phone,
+        email: dto.email,
+        passwordHash,
         vehicleType: dto.vehicleType,
         status: DriverStatus.OFFLINE,
       },
@@ -35,6 +38,10 @@ export class DriversRepository {
   async findById(id: string): Promise<Driver | null> {
     const row = await this.prisma.driver.findUnique({ where: { id } });
     return row ? toDomain(row) : null;
+  }
+
+  async findRowByIdentifier(identifier: string): Promise<DriverRow | null> {
+    return this.prisma.driver.findFirst({ where: { OR: [{ phone: identifier }, { email: identifier }] } });
   }
 
   async updateStatus(id: string, status: DriverStatus): Promise<Driver> {

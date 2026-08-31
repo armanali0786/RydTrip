@@ -11,18 +11,22 @@ import {
 } from '../features/rider/RideStatusCards';
 import { useBookingStore } from '../stores/useBookingStore';
 import { useRideStore } from '../stores/useRideStore';
+import { useAuthStore } from '../stores/useAuthStore';
 import { createRide, cancelRide } from '../api/rides';
 import { wsClient } from '../websocket/client';
 import { Button } from '../components/ui/Button';
 import { MapPin, Navigation, ArrowLeft } from 'lucide-react';
+import { RequireAuth } from '../components/auth/RequireAuth';
 
-export const RiderPage: React.FC = () => {
+const RiderPageContent: React.FC = () => {
   const { pickup, destination, selectedVehicle, paymentMethod } = useBookingStore();
   const { activeRide, driverLocation, setActiveRide, updateRideStatus, assignDriver, updateDriverLocation, cancelActiveRide, resetRide } =
     useRideStore();
+  const { user } = useAuthStore();
 
   const [step, setStep] = useState<'SELECT_RIDE' | 'ACTIVE_RIDE'>('SELECT_RIDE');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Subscribe to WebSocket events for real-time ride state transitions
   useEffect(() => {
@@ -53,14 +57,15 @@ export const RiderPage: React.FC = () => {
   }, [activeRide, updateRideStatus, assignDriver, updateDriverLocation]);
 
   const handleRequestRide = async () => {
-    if (!pickup || !destination) return;
+    if (!pickup || !destination || !user) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       const newRide = await createRide({
-        riderId: 'rider_arman_01',
-        riderName: 'Arman Ali',
-        riderPhone: '+91 98765 43210',
+        riderId: user.id,
+        riderName: user.name,
+        riderPhone: user.phone,
         pickup,
         destination,
         vehicleType: selectedVehicle,
@@ -70,7 +75,7 @@ export const RiderPage: React.FC = () => {
       setActiveRide(newRide);
       setStep('ACTIVE_RIDE');
     } catch (e) {
-      console.error('Failed to create ride:', e);
+      setSubmitError(e instanceof Error ? e.message : 'Failed to request a ride');
     } finally {
       setIsSubmitting(false);
     }
@@ -122,10 +127,17 @@ export const RiderPage: React.FC = () => {
 
             {/* Step 1: Ride Options Selection */}
             {step === 'SELECT_RIDE' && (
-              <RideOptionsList
-                onConfirmRide={handleRequestRide}
-                isSubmitting={isSubmitting}
-              />
+              <>
+                {submitError && (
+                  <div className="rounded-lg bg-red-50 px-3.5 py-2.5 text-body-sm text-red-700 border border-red-100">
+                    {submitError}
+                  </div>
+                )}
+                <RideOptionsList
+                  onConfirmRide={handleRequestRide}
+                  isSubmitting={isSubmitting}
+                />
+              </>
             )}
 
             {/* Step 2: Active Ride States */}
@@ -169,3 +181,9 @@ export const RiderPage: React.FC = () => {
     </div>
   );
 };
+
+export const RiderPage: React.FC = () => (
+  <RequireAuth role="RIDER">
+    <RiderPageContent />
+  </RequireAuth>
+);

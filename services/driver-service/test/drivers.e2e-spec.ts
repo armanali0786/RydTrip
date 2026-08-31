@@ -39,7 +39,13 @@ describe('Driver Service (e2e)', () => {
   it('creates a driver in OFFLINE status and fetches it', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/drivers')
-      .send({ name: 'Asha Rao', phone: '+919812345670', vehicleType: 'SEDAN' })
+      .send({
+        name: 'Asha Rao',
+        phone: '+919812345670',
+        email: 'asha@example.com',
+        password: 'super-secret',
+        vehicleType: 'SEDAN',
+      })
       .expect(201);
 
     expect(createRes.body.status).toBe('OFFLINE');
@@ -54,7 +60,13 @@ describe('Driver Service (e2e)', () => {
   it('persists a status transition across a fresh Prisma connection (proves it is not in-memory)', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/drivers')
-      .send({ name: 'Restart Check', phone: '+919812399999', vehicleType: 'AUTO' })
+      .send({
+        name: 'Restart Check',
+        phone: '+919812399999',
+        email: 'restart-check-driver@example.com',
+        password: 'super-secret',
+        vehicleType: 'AUTO',
+      })
       .expect(201);
     const id = createRes.body.id;
 
@@ -80,6 +92,19 @@ describe('Driver Service (e2e)', () => {
       .expect(400);
   });
 
+  it('rejects registration with an invalid email with 400', async () => {
+    await request(app.getHttpServer())
+      .post('/drivers')
+      .send({
+        name: 'Bad Email',
+        phone: '+911234511112',
+        email: 'not-an-email',
+        password: 'super-secret',
+        vehicleType: 'SEDAN',
+      })
+      .expect(400);
+  });
+
   it('returns 404 for an unknown driver', async () => {
     await request(app.getHttpServer())
       .get('/drivers/00000000-0000-0000-0000-000000000000')
@@ -89,7 +114,13 @@ describe('Driver Service (e2e)', () => {
   it('allows OFFLINE -> AVAILABLE and rejects OFFLINE -> RESERVED with 409', async () => {
     const createRes = await request(app.getHttpServer())
       .post('/drivers')
-      .send({ name: 'Ravi Kumar', phone: '+911111111112', vehicleType: 'AUTO' })
+      .send({
+        name: 'Ravi Kumar',
+        phone: '+911111111112',
+        email: 'ravi.kumar@example.com',
+        password: 'super-secret',
+        vehicleType: 'AUTO',
+      })
       .expect(201);
     const id = createRes.body.id;
 
@@ -103,5 +134,73 @@ describe('Driver Service (e2e)', () => {
       .send({ status: 'AVAILABLE' })
       .expect(200);
     expect(okRes.body.status).toBe('AVAILABLE');
+  });
+
+  it('registers a driver and logs in by phone with the same credentials, returning a bearer token', async () => {
+    await request(app.getHttpServer())
+      .post('/drivers')
+      .send({
+        name: 'Login Test Driver',
+        phone: '+911234599998',
+        email: 'login-test-driver@example.com',
+        password: 'correct-horse',
+        vehicleType: 'SEDAN',
+      })
+      .expect(201);
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/drivers/login')
+      .send({ identifier: '+911234599998', password: 'correct-horse' })
+      .expect(200);
+
+    expect(typeof loginRes.body.accessToken).toBe('string');
+    expect(loginRes.body.driver.phone).toBe('+911234599998');
+    expect(loginRes.body.driver.email).toBe('login-test-driver@example.com');
+    expect(loginRes.body.driver.passwordHash).toBeUndefined();
+  });
+
+  it('logs in by email as well as phone', async () => {
+    await request(app.getHttpServer())
+      .post('/drivers')
+      .send({
+        name: 'Email Login Driver',
+        phone: '+911234577778',
+        email: 'email-login-driver@example.com',
+        password: 'correct-horse',
+        vehicleType: 'SEDAN',
+      })
+      .expect(201);
+
+    const loginRes = await request(app.getHttpServer())
+      .post('/drivers/login')
+      .send({ identifier: 'email-login-driver@example.com', password: 'correct-horse' })
+      .expect(200);
+
+    expect(loginRes.body.driver.email).toBe('email-login-driver@example.com');
+  });
+
+  it('rejects login with the wrong password with 401', async () => {
+    await request(app.getHttpServer())
+      .post('/drivers')
+      .send({
+        name: 'Wrong Password Driver',
+        phone: '+911234588887',
+        email: 'wrong-password-driver@example.com',
+        password: 'correct-horse',
+        vehicleType: 'SEDAN',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/drivers/login')
+      .send({ identifier: '+911234588887', password: 'wrong-password' })
+      .expect(401);
+  });
+
+  it('rejects login for an unregistered identifier with 401', async () => {
+    await request(app.getHttpServer())
+      .post('/drivers/login')
+      .send({ identifier: '+910000000001', password: 'whatever' })
+      .expect(401);
   });
 });

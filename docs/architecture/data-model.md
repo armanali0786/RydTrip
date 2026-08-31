@@ -21,6 +21,8 @@ erDiagram
         uuid id PK
         text name
         text phone
+        text email
+        text password_hash
         timestamptz created_at
         timestamptz updated_at
     }
@@ -28,6 +30,8 @@ erDiagram
         uuid id PK
         text name
         text phone
+        text email
+        text password_hash
         text vehicle_type
         text status
         timestamptz created_at
@@ -70,6 +74,8 @@ erDiagram
 | `id` | uuid | PK, default `gen_random_uuid()` |
 | `name` | text | not null |
 | `phone` | text | not null, unique |
+| `email` | text | not null, unique (ADR-005) |
+| `password_hash` | text | not null, bcrypt (ADR-005) — never returned by any endpoint |
 | `created_at` | timestamptz | not null, default now() |
 | `updated_at` | timestamptz | not null, default now() |
 
@@ -80,6 +86,8 @@ erDiagram
 | `id` | uuid | PK |
 | `name` | text | not null |
 | `phone` | text | not null, unique |
+| `email` | text | not null, unique (ADR-005) |
+| `password_hash` | text | not null, bcrypt (ADR-005) — never returned by any endpoint |
 | `vehicle_type` | text | not null |
 | `status` | text | not null, one of the driver state machine states, default `OFFLINE` |
 | `created_at` | timestamptz | not null, default now() |
