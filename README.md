@@ -1,4 +1,4 @@
-# 🚕 RideMesh
+# 🚕 RydTrip
 
 Cost-optimized, real-time distributed ride dispatch platform — built locally first
 (₹0 out-of-pocket), with AWS used only for controlled, temporary cloud demonstrations.

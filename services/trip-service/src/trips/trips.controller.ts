@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CancelTripDto } from './dto/cancel-trip.dto';
-import { CreateTripDto } from './dto/create-trip.dto';
 import { TripsService } from './trips.service';
 
 @ApiTags('trips')
@@ -9,15 +8,9 @@ import { TripsService } from './trips.service';
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
 
-  /**
-   * Phase 2/3 bridge endpoint — see TripsService.create(). Removed from the
-   * public contract once ride.requested consumption replaces it (Phase 5+7);
-   * see docs/architecture/api-contracts.md, which does not list this path.
-   */
-  @Post()
-  async create(@Body() dto: CreateTripDto) {
-    return this.tripsService.create(dto);
-  }
+  // No POST / here — trips are created by consuming ride.requested (Phase 5,
+  // see RideEventsConsumer), not via a direct HTTP call. The Phase 2/3 bridge
+  // endpoint that used to live here is retired.
 
   @Get(':id')
   async findOne(@Param('id') id: string) {

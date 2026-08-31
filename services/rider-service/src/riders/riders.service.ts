@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Rider } from '@ridemesh/event-schema';
+import { Rider } from '@rydtrip/event-schema';
 import { CreateRiderDto } from './dto/create-rider.dto';
 import { RidersRepository } from './riders.repository';
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Driver, DriverStatus } from '@ridemesh/event-schema';
+import { Driver, DriverStatus } from '@rydtrip/event-schema';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import type { Driver as DriverRow } from '../../prisma-client';

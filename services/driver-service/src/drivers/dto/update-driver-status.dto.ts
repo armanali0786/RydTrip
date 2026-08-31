@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { DriverStatus } from '@ridemesh/event-schema';
+import { DriverStatus } from '@rydtrip/event-schema';
 import { IsEnum } from 'class-validator';
 
 export class UpdateDriverStatusDto {

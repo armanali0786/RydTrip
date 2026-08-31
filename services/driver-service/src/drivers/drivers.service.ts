@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Driver, DriverStatus } from '@ridemesh/event-schema';
+import { Driver, DriverStatus } from '@rydtrip/event-schema';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { assertValidDriverTransition, InvalidDriverTransitionError } from './driver-state-machine';
 import { DriversRepository } from './drivers.repository';

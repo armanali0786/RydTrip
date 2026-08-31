@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Rider } from '@ridemesh/event-schema';
+import { Rider } from '@rydtrip/event-schema';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRiderDto } from './dto/create-rider.dto';
 import type { Rider as RiderRow } from '../../prisma-client';

@@ -1,6 +1,6 @@
 # Security Policy
 
-This is a personal learning/demonstration project (RideMesh), not a production service
+This is a personal learning/demonstration project (RydTrip), not a production service
 handling real user data. That said:
 
 - Never commit credentials, API keys, JWT secrets, or `.env` files — see `.gitignore`.

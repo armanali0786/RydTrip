@@ -11,9 +11,9 @@ describe('Driver Service (e2e)', () => {
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:16-alpine')
-      .withDatabase('ridemesh_drivers_test')
-      .withUsername('ridemesh')
-      .withPassword('ridemesh')
+      .withDatabase('rydtrip_drivers_test')
+      .withUsername('rydtrip')
+      .withPassword('rydtrip')
       .start();
 
     process.env.DATABASE_URL = container.getConnectionUri();

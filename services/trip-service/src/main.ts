@@ -10,7 +10,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Trip Service')
-    .setDescription('RideMesh Trip Service — ride/trip lifecycle state machine')
+    .setDescription('RydTrip Trip Service — ride/trip lifecycle state machine')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);

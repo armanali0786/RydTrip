@@ -1,9 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { CancellationReason, Ride, RideStatus } from '@ridemesh/event-schema';
+import { CancellationReason, GeoPoint, Ride, RideStatus } from '@rydtrip/event-schema';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateTripDto } from './dto/create-trip.dto';
 import type { Ride as RideRow } from '../../prisma-client';
+
+export interface CreateRideInput {
+  /** Provided by the ride.requested event's payload — Rider Service, not this repository, mints the id. */
+  id: string;
+  riderId: string;
+  pickup: GeoPoint;
+  destination: GeoPoint;
+}
 
 function toDomain(row: RideRow): Ride {
   return {
@@ -51,15 +58,16 @@ function eventTypeForStatus(status: RideStatus): string {
 export class TripsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateTripDto): Promise<Ride> {
+  async create(input: CreateRideInput): Promise<Ride> {
     const row = await this.prisma.$transaction(async (tx) => {
       const created = await tx.ride.create({
         data: {
-          riderId: dto.riderId,
-          pickupLat: dto.pickup.lat,
-          pickupLng: dto.pickup.lng,
-          destinationLat: dto.destination.lat,
-          destinationLng: dto.destination.lng,
+          id: input.id,
+          riderId: input.riderId,
+          pickupLat: input.pickup.lat,
+          pickupLng: input.pickup.lng,
+          destinationLat: input.destination.lat,
+          destinationLng: input.destination.lng,
           status: RideStatus.REQUESTED,
         },
       });

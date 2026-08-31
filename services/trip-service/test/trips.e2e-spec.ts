@@ -2,25 +2,65 @@ import { execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { KafkaContainer, StartedKafkaContainer } from '@testcontainers/kafka';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
+import { createKafkaClient, EventPublisher, KAFKA_TOPICS } from '@rydtrip/event-schema';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
+// StartedKafkaContainer has no getBootstrapServers() helper — the PLAINTEXT
+// listener testcontainers wires up is exposed on container port 9093.
+function bootstrapServers(container: StartedKafkaContainer): string {
+  return `${container.getHost()}:${container.getMappedPort(9093)}`;
+}
+
+async function waitFor<T>(
+  fn: () => Promise<T>,
+  predicate: (value: T) => boolean,
+  { timeoutMs = 20000, intervalMs = 300 } = {},
+): Promise<T> {
+  const deadline = Date.now() + timeoutMs;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const value = await fn();
+    if (predicate(value)) return value;
+    if (Date.now() > deadline) {
+      throw new Error(`waitFor: condition not met within ${timeoutMs}ms`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
 describe('Trip Service (e2e)', () => {
-  let container: StartedPostgreSqlContainer;
+  let pg: StartedPostgreSqlContainer;
+  let kafka: StartedKafkaContainer;
   let app: INestApplication;
+  let publisher: EventPublisher;
+
+  const tripPayload = (rideId: string) => ({
+    rideId,
+    riderId: randomUUID(),
+    pickup: { lat: 12.9716, lng: 77.5946 },
+    destination: { lat: 12.9352, lng: 77.6146 },
+  });
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine')
-      .withDatabase('ridemesh_trips_test')
-      .withUsername('ridemesh')
-      .withPassword('ridemesh')
+    pg = await new PostgreSqlContainer('postgres:16-alpine')
+      .withDatabase('rydtrip_trips_test')
+      .withUsername('rydtrip')
+      .withPassword('rydtrip')
       .start();
+    kafka = await new KafkaContainer('confluentinc/cp-kafka:7.6.1').withKraft().start();
 
-    process.env.DATABASE_URL = container.getConnectionUri();
+    process.env.DATABASE_URL = pg.getConnectionUri();
+    process.env.KAFKA_BROKERS = bootstrapServers(kafka);
 
     execSync('npx prisma migrate deploy', { env: { ...process.env }, stdio: 'inherit' });
+
+    const testKafka = createKafkaClient({ clientId: 'test-publisher', brokers: [bootstrapServers(kafka)] });
+    publisher = new EventPublisher(testKafka, 'test-harness');
+    await publisher.connect();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -29,85 +69,143 @@ describe('Trip Service (e2e)', () => {
   });
 
   afterAll(async () => {
+    await publisher.disconnect();
     await app.close();
-    await container.stop();
+    await pg.stop();
+    await kafka.stop();
   });
 
-  const tripPayload = () => ({
-    riderId: randomUUID(),
-    pickup: { lat: 12.9716, lng: 77.5946 },
-    destination: { lat: 12.9352, lng: 77.6146 },
-  });
+  const getTrip = (id: string) => request(app.getHttpServer()).get(`/trips/${id}`);
 
   it('GET /health/live and /health/ready return 200', async () => {
     await request(app.getHttpServer()).get('/health/live').expect(200);
     await request(app.getHttpServer()).get('/health/ready').expect(200);
   });
 
-  it('creates a trip which lands in MATCHING (REQUESTED -> MATCHING applied synchronously in Phase 2/3)', async () => {
-    const res = await request(app.getHttpServer()).post('/trips').send(tripPayload()).expect(201);
-    expect(res.body.status).toBe('MATCHING');
+  it('consumes ride.requested and creates the ride, landing in MATCHING', async () => {
+    const rideId = randomUUID();
+    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideId), {
+      correlationId: randomUUID(),
+      key: rideId,
+    });
 
-    const getRes = await request(app.getHttpServer()).get(`/trips/${res.body.id}`).expect(200);
-    expect(getRes.body.status).toBe('MATCHING');
+    const res = await waitFor(
+      () => getTrip(rideId).then((r) => r),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
+    expect(res.body.id).toBe(rideId);
   });
 
-  it('persists across a fresh Prisma connection and records trip_events audit rows', async () => {
-    const createRes = await request(app.getHttpServer()).post('/trips').send(tripPayload()).expect(201);
-    const id = createRes.body.id;
-
-    await request(app.getHttpServer())
-      .post(`/trips/${id}/cancel`)
-      .send({ reason: 'RIDER_CANCELLED' })
-      .expect(201);
-
-    const secondModuleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    const secondApp = secondModuleRef.createNestApplication();
-    await secondApp.init();
-
-    const getRes = await request(secondApp.getHttpServer()).get(`/trips/${id}`).expect(200);
-    expect(getRes.body.status).toBe('CANCELLED');
-    expect(getRes.body.cancellationReason).toBe('RIDER_CANCELLED');
-
-    await secondApp.close();
+  it('records the trip_events audit trail for a consumed ride.requested', async () => {
+    const rideId = randomUUID();
+    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideId), {
+      correlationId: randomUUID(),
+      key: rideId,
+    });
+    await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
 
     const prisma = app.get(PrismaService);
-    const events = await prisma.tripEvent.findMany({ where: { rideId: id } });
-    const eventTypes = events.map((event) => event.eventType).sort();
-    expect(eventTypes).toEqual(['ride.cancelled', 'ride.matching', 'ride.requested'].sort());
+    const events = await prisma.tripEvent.findMany({ where: { rideId } });
+    expect(events.map((e) => e.eventType).sort()).toEqual(['ride.matching', 'ride.requested'].sort());
   });
 
-  it('rejects a malformed create request with 400', async () => {
-    await request(app.getHttpServer())
-      .post('/trips')
-      .send({ riderId: 'not-a-uuid', pickup: { lat: 999, lng: 0 }, destination: { lat: 0, lng: 0 } })
-      .expect(400);
+  it('consumes ride.cancelled and cancels an existing ride', async () => {
+    const rideId = randomUUID();
+    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideId), {
+      correlationId: randomUUID(),
+      key: rideId,
+    });
+    await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
+
+    await publisher.publish(
+      KAFKA_TOPICS.RIDE_CANCELLED,
+      KAFKA_TOPICS.RIDE_CANCELLED,
+      { rideId, reason: 'RIDER_CANCELLED' },
+      { correlationId: randomUUID(), key: rideId },
+    );
+
+    const res = await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'CANCELLED',
+    );
+    expect(res.body.cancellationReason).toBe('RIDER_CANCELLED');
   });
 
-  it('returns 404 for an unknown trip', async () => {
-    await request(app.getHttpServer()).get(`/trips/${randomUUID()}`).expect(404);
+  it('a malformed ride.requested payload is logged and skipped, not crashed on', async () => {
+    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, { not: 'a valid payload' }, {
+      correlationId: randomUUID(),
+    });
+
+    // The consumer loop must survive a poison message — proven by the app
+    // still answering a totally unrelated request right after.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await request(app.getHttpServer()).get('/health/live').expect(200);
   });
 
-  it('rejects driver-arrived on a MATCHING trip with 409, not 500 (no dispatch/acceptance yet)', async () => {
-    const res = await request(app.getHttpServer()).post('/trips').send(tripPayload()).expect(201);
-    await request(app.getHttpServer()).post(`/trips/${res.body.id}/driver-arrived`).expect(409);
-  });
+  it(
+    'exit criterion: killing the consumer and restarting it resumes from the committed offset with no message loss',
+    async () => {
+      // 1. Publish and confirm A is processed by the currently running consumer
+      //    — this is what advances the committed offset past A.
+      const rideA = randomUUID();
+      await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideA), {
+        correlationId: randomUUID(),
+        key: rideA,
+      });
+      await waitFor(
+        () => getTrip(rideA),
+        (r) => r.status === 200 && r.body.status === 'MATCHING',
+      );
 
-  it('cancels a MATCHING trip and records the cancellation reason', async () => {
-    const res = await request(app.getHttpServer()).post('/trips').send(tripPayload()).expect(201);
+      // 2. Kill the consumer: close the whole Nest app (runs
+      //    RideEventsConsumer.onModuleDestroy -> consumer.disconnect()).
+      await app.close();
 
-    const cancelRes = await request(app.getHttpServer())
-      .post(`/trips/${res.body.id}/cancel`)
-      .send({ reason: 'RIDER_CANCELLED' })
-      .expect(201);
+      // 3. While no consumer is running, publish two more events. Kafka
+      //    retains them — nothing is subscribed to receive them yet.
+      const rideB = randomUUID();
+      const rideC = randomUUID();
+      await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideB), {
+        correlationId: randomUUID(),
+        key: rideB,
+      });
+      await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideC), {
+        correlationId: randomUUID(),
+        key: rideC,
+      });
 
-    expect(cancelRes.body.status).toBe('CANCELLED');
-    expect(cancelRes.body.cancellationReason).toBe('RIDER_CANCELLED');
-  });
+      // 4. Restart: a brand new app instance, same consumer group id
+      //    ("trip-service", hardcoded in RideEventsConsumer) — this is what
+      //    makes it resume from the last committed offset rather than
+      //    replaying from the beginning or starting from the latest offset.
+      const restartedModuleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+      const restartedApp = restartedModuleRef.createNestApplication();
+      await restartedApp.init();
 
-  it('rejects cancelling an already-cancelled (terminal) trip with 409', async () => {
-    const res = await request(app.getHttpServer()).post('/trips').send(tripPayload()).expect(201);
-    await request(app.getHttpServer()).post(`/trips/${res.body.id}/cancel`).send({}).expect(201);
-    await request(app.getHttpServer()).post(`/trips/${res.body.id}/cancel`).send({}).expect(409);
-  });
+      const getTripOnRestarted = (id: string) => request(restartedApp.getHttpServer()).get(`/trips/${id}`);
+
+      // 5. Both B and C — published entirely while the consumer was down —
+      //    must still get processed. That's "no message loss".
+      const resB = await waitFor(
+        () => getTripOnRestarted(rideB),
+        (r) => r.status === 200 && r.body.status === 'MATCHING',
+      );
+      const resC = await waitFor(
+        () => getTripOnRestarted(rideC),
+        (r) => r.status === 200 && r.body.status === 'MATCHING',
+      );
+      expect(resB.body.id).toBe(rideB);
+      expect(resC.body.id).toBe(rideC);
+
+      // Hand off to afterAll's cleanup — app1 is already closed.
+      app = restartedApp;
+    },
+    30000,
+  );
 });

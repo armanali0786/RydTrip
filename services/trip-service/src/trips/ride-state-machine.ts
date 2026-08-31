@@ -1,4 +1,4 @@
-import { RideStatus } from '@ridemesh/event-schema';
+import { RideStatus } from '@rydtrip/event-schema';
 
 /**
  * Exhaustive transition table from docs/architecture/state-machines.md.

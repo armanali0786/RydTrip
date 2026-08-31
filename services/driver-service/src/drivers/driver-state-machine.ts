@@ -1,4 +1,4 @@
-import { DriverStatus } from '@ridemesh/event-schema';
+import { DriverStatus } from '@rydtrip/event-schema';
 
 /**
  * Exhaustive transition table from docs/architecture/state-machines.md.

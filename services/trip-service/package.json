@@ -1,5 +1,5 @@
 {
-  "name": "@ridemesh/trip-service",
+  "name": "@rydtrip/trip-service",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -23,7 +23,7 @@
     "@nestjs/platform-express": "^10.4.15",
     "@nestjs/swagger": "^8.1.1",
     "@prisma/client": "^5.22.0",
-    "@ridemesh/event-schema": "*",
+    "@rydtrip/event-schema": "*",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "prisma": "^5.22.0",
@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^10.4.15",
+    "@testcontainers/kafka": "^10.16.0",
     "@testcontainers/postgresql": "^10.16.0",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",

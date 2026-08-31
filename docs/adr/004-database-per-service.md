@@ -20,9 +20,9 @@ schema:
 
 | Service | Database | Tables |
 |---|---|---|
-| Rider Service | `ridemesh_riders` | `riders` |
-| Driver Service | `ridemesh_drivers` | `drivers` |
-| Trip Service | `ridemesh_trips` | `rides`, `trip_events`, `processed_events` |
+| Rider Service | `rydtrip_riders` | `riders` |
+| Driver Service | `rydtrip_drivers` | `drivers` |
+| Trip Service | `rydtrip_trips` | `rides`, `trip_events`, `processed_events` |
 
 `rides.rider_id` and `rides.driver_id` remain columns (plain UUIDs) but are **not**
 database-level foreign keys — Rider and Driver rows live in a different database
@@ -58,7 +58,7 @@ them sharing a server.
 ## Consequences
 
 - Each service needs its own `DATABASE_URL`, its own `prisma/schema.prisma`, and its
-  own migration history — there is no single "the" RideMesh database.
+  own migration history — there is no single "the" RydTrip database.
 - Rider/driver existence is validated by the caller (Rider Service, via whatever
   created the ride) at write time, not enforced by the database; an ID that turns out
   to be wrong is an application bug to catch in tests, not something Postgres can catch

@@ -10,7 +10,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Rider Service')
-    .setDescription('RideMesh Rider Service — rider registration (Phase 2 scope)')
+    .setDescription('RydTrip Rider Service — rider registration (Phase 2 scope)')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);

@@ -1,6 +1,6 @@
 # Contributing
 
-RideMesh is built phase by phase — see [`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md)
+RydTrip is built phase by phase — see [`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md)
 before opening any change. A few ground rules:
 
 1. **Respect phase order.** Don't add Kubernetes manifests before Phase 9, don't reach

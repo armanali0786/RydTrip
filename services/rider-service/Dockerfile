@@ -25,17 +25,17 @@ RUN npm ci --workspace=libraries/event-schema --workspace=services/rider-service
 
 FROM node:22-alpine AS runtime
 RUN apk add --no-cache openssl \
- && addgroup -S ridemesh && adduser -S ridemesh -G ridemesh
+ && addgroup -S rydtrip && adduser -S rydtrip -G rydtrip
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=prod-deps --chown=ridemesh:ridemesh /app/node_modules ./node_modules
-COPY --from=build --chown=ridemesh:ridemesh /app/libraries/event-schema/dist ./libraries/event-schema/dist
-COPY --from=build --chown=ridemesh:ridemesh /app/libraries/event-schema/package.json ./libraries/event-schema/package.json
-COPY --from=build --chown=ridemesh:ridemesh /app/services/rider-service/dist ./services/rider-service/dist
-COPY --from=build --chown=ridemesh:ridemesh /app/services/rider-service/package.json ./services/rider-service/package.json
-COPY --from=build --chown=ridemesh:ridemesh /app/services/rider-service/prisma ./services/rider-service/prisma
-COPY --from=build --chown=ridemesh:ridemesh /app/services/rider-service/prisma-client ./services/rider-service/prisma-client
-USER ridemesh
+COPY --from=prod-deps --chown=rydtrip:rydtrip /app/node_modules ./node_modules
+COPY --from=build --chown=rydtrip:rydtrip /app/libraries/event-schema/dist ./libraries/event-schema/dist
+COPY --from=build --chown=rydtrip:rydtrip /app/libraries/event-schema/package.json ./libraries/event-schema/package.json
+COPY --from=build --chown=rydtrip:rydtrip /app/services/rider-service/dist ./services/rider-service/dist
+COPY --from=build --chown=rydtrip:rydtrip /app/services/rider-service/package.json ./services/rider-service/package.json
+COPY --from=build --chown=rydtrip:rydtrip /app/services/rider-service/prisma ./services/rider-service/prisma
+COPY --from=build --chown=rydtrip:rydtrip /app/services/rider-service/prisma-client ./services/rider-service/prisma-client
+USER rydtrip
 WORKDIR /app/services/rider-service
 EXPOSE 3001
 CMD ["npm", "run", "start:prod"]

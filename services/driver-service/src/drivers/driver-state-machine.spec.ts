@@ -1,4 +1,4 @@
-import { DriverStatus } from '@ridemesh/event-schema';
+import { DriverStatus } from '@rydtrip/event-schema';
 import { canTransitionDriverStatus } from './driver-state-machine';
 
 describe('driver state machine', () => {

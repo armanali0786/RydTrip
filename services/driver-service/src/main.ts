@@ -10,7 +10,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Driver Service')
-    .setDescription('RideMesh Driver Service — driver registration and status state machine')
+    .setDescription('RydTrip Driver Service — driver registration and status state machine')
     .setVersion('1.0')
     .build();
   const document = SwaggerModule.createDocument(app, config);

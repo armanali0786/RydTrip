@@ -1,4 +1,4 @@
-# RideMesh — Architecture Overview
+# RydTrip — Architecture Overview
 
 Scope: the services built in Phases 2–7 (Rider, Driver, Trip, API Gateway, Location,
 Dispatch). Notification/Analytics services are out of scope until explicitly scheduled.

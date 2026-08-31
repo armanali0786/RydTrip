@@ -1,4 +1,4 @@
-# RideMesh — Phase-Wise Implementation Plan
+# RydTrip — Phase-Wise Implementation Plan
 
 Rule: **one phase at a time.** A phase is not started until the previous phase's exit
 criteria are met. This document is the source of truth for what "done" means per phase.
@@ -97,7 +97,7 @@ Deliverables:
 - Jest unit tests for state machine transition guards — exhaustive, not spot checks: [driver-state-machine.spec.ts](../../services/driver-service/src/drivers/driver-state-machine.spec.ts), [ride-state-machine.spec.ts](../../services/trip-service/src/trips/ride-state-machine.spec.ts)
 - Supertest e2e tests for each service's HTTP surface (`services/*/test/*.e2e-spec.ts`)
 - OpenAPI spec per service (`@nestjs/swagger`), served at `/docs`
-- Shared `libraries/@ridemesh/event-schema` package: `DriverStatus`/`RideStatus`/`CancellationReason` enums, `Rider`/`Driver`/`Ride` entity types, and the `EventEnvelope` shape (typed ahead of Phase 5, not wired to any transport yet)
+- Shared `libraries/@rydtrip/event-schema` package: `DriverStatus`/`RideStatus`/`CancellationReason` enums, `Rider`/`Driver`/`Ride` entity types, and the `EventEnvelope` shape (typed ahead of Phase 5, not wired to any transport yet)
 - API Gateway is a real reverse proxy (native `fetch`, no framework dependency) routing `/riders`, `/drivers`, `/trips` to their owning service and injecting `x-correlation-id`
 
 Design notes worth remembering for later phases:
@@ -120,14 +120,14 @@ Note: dev servers run via `ts-node-dev`, not `tsx` — `tsx`'s esbuild-based tra
 Deliverables:
 - [ADR-004](../adr/004-database-per-service.md): each service gets its own Postgres database and its own Prisma schema — no cross-service foreign keys. `rides.rider_id`/`driver_id` are plain UUID columns, validated at the application level, not by the database.
 - Prisma schema per service, each with its own service-local generated client (`services/*/prisma-client`, gitignored) to avoid npm workspaces hoisting collisions on `node_modules/@prisma/client`:
-  - `rider-service` → `ridemesh_riders` DB → `riders`
-  - `driver-service` → `ridemesh_drivers` DB → `drivers`
-  - `trip-service` → `ridemesh_trips` DB → `rides`, `trip_events`, `processed_events`
+  - `rider-service` → `rydtrip_riders` DB → `riders`
+  - `driver-service` → `rydtrip_drivers` DB → `drivers`
+  - `trip-service` → `rydtrip_trips` DB → `rides`, `trip_events`, `processed_events`
 - Prisma Migrate initial migration per service (`prisma/migrations/`)
 - Repository layer per service rewritten on Prisma Client, async throughout (controllers/services updated accordingly); Trip Service's repository also writes a `trip_events` audit row transactionally on every state transition
 - Testcontainers-based e2e tests (`@testcontainers/postgresql`) per service — a real Postgres container is started per test run and `prisma migrate deploy` is executed against it, so the tests prove the migration works from a clean database, not just that hand-migrated dev data happens to work
 - `prisma/seed.ts` per service (`npm run prisma:seed`)
-- Local dev Postgres: a single `docker run postgres:16-alpine` container (`ridemesh-postgres`, host port 5433) with three databases created inside it — formalized into `docker-compose.yml` in Phase 4
+- Local dev Postgres: a single `docker run postgres:16-alpine` container (`rydtrip-postgres`, host port 5433) with three databases created inside it — formalized into `docker-compose.yml` in Phase 4
 
 Exit criteria:
 - [x] All Phase 2 integration tests still pass against Postgres instead of in-memory — 25 (driver) + 22 (trip) + 5 (rider) tests green, all against real Testcontainers Postgres
@@ -143,7 +143,7 @@ Note: `tsx`'s decorator-metadata problem from Phase 2 applies here too — `star
 **Goal:** one command brings up the whole local stack.
 
 Deliverables:
-- Multi-stage `Dockerfile` per service (`services/*/Dockerfile`): `deps` → `build` → `prod-deps` → `runtime`, non-root user (`ridemesh`), `node:22-alpine`. Prisma-backed services run `prisma migrate deploy` on boot (`npm run start:prod`) before starting the app, so a fresh container always ends up schema-current.
+- Multi-stage `Dockerfile` per service (`services/*/Dockerfile`): `deps` → `build` → `prod-deps` → `runtime`, non-root user (`rydtrip`), `node:22-alpine`. Prisma-backed services run `prisma migrate deploy` on boot (`npm run start:prod`) before starting the app, so a fresh container always ends up schema-current.
 - Root [`docker-compose.yml`](../../docker-compose.yml): one `postgres:16-alpine` instance (formalizing ADR-004's three-databases-one-instance local setup via [`infrastructure/postgres/init-databases.sql`](../../infrastructure/postgres/init-databases.sql)), all four NestJS services, healthchecks on every service (Postgres via `pg_isready`, Node services via an inline `http.get` check against `/health/ready` — no extra curl/wget binary needed in the minimal images), `depends_on: condition: service_healthy` wiring so `api-gateway` only starts once its three upstreams are actually healthy, not just started.
 - Host ports are overridable (`${GATEWAY_HOST_PORT:-3000}` etc.) — needed on this dev machine specifically because ports 3000 and 5432 are already held by unrelated local processes; default ports match each service's documented `.env.example`.
 - `.env.example` per service already existed from Phase 2/3; no secrets committed (verified — `.env` and `services/*/prisma-client` stay gitignored).

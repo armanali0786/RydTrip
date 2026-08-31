@@ -2,7 +2,7 @@
 
 ## Context
 
-RideMesh models the distributed-systems problems of a ride-hailing platform: ride
+RydTrip models the distributed-systems problems of a ride-hailing platform: ride
 lifecycle management, high-frequency driver location ingestion, proximity-based
 matching under concurrency, and independent scaling needs per workload. A monolith
 would hide exactly the problems this project exists to demonstrate — independent

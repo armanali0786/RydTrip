@@ -1,4 +1,4 @@
-import { RideStatus } from '@ridemesh/event-schema';
+import { RideStatus } from '@rydtrip/event-schema';
 import { canTransitionRideStatus } from './ride-state-machine';
 
 const ALL_STATES = Object.values(RideStatus);

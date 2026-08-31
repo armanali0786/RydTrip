@@ -1,13 +1,16 @@
 {
-  "name": "@ridemesh/event-schema",
+  "name": "@rydtrip/event-schema",
   "version": "0.0.1",
   "private": true,
-  "description": "Shared entity and event envelope types for RideMesh services",
+  "description": "Shared entity and event envelope types for RydTrip services",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4"
   },
   "devDependencies": {
     "typescript": "^5.7.3"

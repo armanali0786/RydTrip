@@ -9,7 +9,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('API Gateway')
     .setDescription(
-      'RideMesh API Gateway — routes /riders, /drivers, /trips to their owning ' +
+      'RydTrip API Gateway — routes /riders, /drivers, /trips to their owning ' +
         'services and injects a correlation ID. Holds no domain schema of its own; ' +
         'see each downstream service for its OpenAPI spec at /docs.',
     )

@@ -1,21 +1,30 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { CancellationReason, Ride, RideStatus } from '@ridemesh/event-schema';
-import { CreateTripDto } from './dto/create-trip.dto';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { CancellationReason, Ride, RideStatus } from '@rydtrip/event-schema';
 import { assertValidRideTransition, InvalidRideTransitionError } from './ride-state-machine';
-import { TripsRepository } from './trips.repository';
+import { CreateRideInput, TripsRepository } from './trips.repository';
 
 @Injectable()
 export class TripsService {
+  private readonly logger = new Logger(TripsService.name);
+
   constructor(private readonly repository: TripsRepository) {}
 
   /**
-   * Phase 2/3 bridge: Dispatch Service (Phase 7) doesn't exist yet to consume
-   * `ride.requested` and asynchronously advance REQUESTED -> MATCHING, so we
-   * apply that same guarded transition synchronously here.
+   * Consumes ride.requested (Phase 5, replacing the retired Phase 2/3 HTTP
+   * bridge). Dispatch Service (Phase 7) doesn't exist yet to do real
+   * matching, so we advance REQUESTED -> MATCHING immediately — the guarded
+   * transition Phase 7 will eventually drive from dispatch outcomes instead.
    */
-  async create(dto: CreateTripDto): Promise<Ride> {
-    const ride = await this.repository.create(dto);
-    return this.transitionTo(ride.id, RideStatus.MATCHING);
+  async handleRideRequested(input: CreateRideInput): Promise<void> {
+    const ride = await this.repository.create(input);
+    await this.transitionTo(ride.id, RideStatus.MATCHING);
+    this.logger.log(`ride ${ride.id} created and advanced to MATCHING`);
+  }
+
+  /** Consumes ride.cancelled (Phase 5). See cancel() for the guard applied. */
+  async handleRideCancelled(rideId: string, reason?: CancellationReason): Promise<void> {
+    await this.cancel(rideId, reason);
+    this.logger.log(`ride ${rideId} cancelled via event`);
   }
 
   async findById(id: string): Promise<Ride> {

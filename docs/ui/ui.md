@@ -1,8 +1,8 @@
-# RideMesh Frontend
+# RydTrip Frontend
 
-> Production-style ride-booking frontend for the RideMesh distributed ride-hailing platform.
+> Production-style ride-booking frontend for the RydTrip distributed ride-hailing platform.
 
-RideMesh Frontend provides two user-facing applications:
+RydTrip Frontend provides two user-facing applications:
 
 1. **Rider Web** — search, book, track, and complete rides.
 2. **Driver Web** — go online, receive ride requests, accept/reject rides, share location, and manage trips.
@@ -398,7 +398,7 @@ The main screen contains:
 
 ```text
 ┌─────────────────────────────────────────────┐
-│ RideMesh                              👤    │
+│ RydTrip                              👤    │
 ├─────────────────────────────────────────────┤
 │                                             │
 │                                             │
@@ -696,7 +696,7 @@ must never happen.
 
 ```text
 ┌─────────────────────────────────────────────┐
-│ RideMesh Driver                  🟢 ONLINE │
+│ RydTrip Driver                  🟢 ONLINE │
 ├─────────────────────────────────────────────┤
 │                                             │
 │                    MAP                      │
@@ -1196,7 +1196,7 @@ Ride cancelled
 ### Backend unavailable
 
 ```text
-RideMesh is temporarily unavailable.
+RydTrip is temporarily unavailable.
 
 [ Retry ]
 ```
@@ -2088,4 +2088,4 @@ The impressive demo is:
           Live Driver Movement
 ```
 
-That is what makes the frontend an integral part of **RideMesh**, rather than just a UI attached to a backend.
+That is what makes the frontend an integral part of **RydTrip**, rather than just a UI attached to a backend.

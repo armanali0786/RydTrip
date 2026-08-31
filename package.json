@@ -1,5 +1,5 @@
 {
-  "name": "ridemesh",
+  "name": "rydtrip",
   "private": true,
   "version": "0.0.0",
   "description": "Cost-optimized real-time distributed ride dispatch platform",
@@ -12,10 +12,10 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "dev": "npm run dev --workspace=@ridemesh/web",
-    "dev:rider": "npm run dev --workspace=@ridemesh/rider-web",
-    "dev:driver": "npm run dev --workspace=@ridemesh/driver-web",
-    "build": "npm run build --workspace=@ridemesh/web",
+    "dev": "npm run dev --workspace=@rydtrip/web",
+    "dev:rider": "npm run dev --workspace=@rydtrip/rider-web",
+    "dev:driver": "npm run dev --workspace=@rydtrip/driver-web",
+    "build": "npm run build --workspace=@rydtrip/web",
     "lint": "echo \"Linting passes\"",
     "test": "echo \"Testing passes\""
   },
