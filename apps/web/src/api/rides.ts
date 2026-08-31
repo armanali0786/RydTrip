@@ -15,7 +15,7 @@ export interface CreateRideRequest {
 export const VEHICLE_OPTIONS: VehicleOption[] = [
   {
     type: 'ECONOMY',
-    name: 'UberGo',
+    name: 'RydTrip Go',
     capacity: 4,
     eta: 3,
     fare: 240,
@@ -24,7 +24,7 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
   },
   {
     type: 'PREMIUM',
-    name: 'Uber Premier',
+    name: 'RydTrip Premier',
     capacity: 4,
     eta: 5,
     fare: 390,
@@ -33,7 +33,7 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
   },
   {
     type: 'AUTO',
-    name: 'Uber Auto',
+    name: 'RydTrip Auto',
     capacity: 3,
     eta: 2,
     fare: 140,
@@ -42,7 +42,7 @@ export const VEHICLE_OPTIONS: VehicleOption[] = [
   },
   {
     type: 'XL',
-    name: 'UberXL',
+    name: 'RydTrip XL',
     capacity: 6,
     eta: 6,
     fare: 550,

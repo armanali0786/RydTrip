@@ -14,7 +14,7 @@ interface AuthState {
 const DEFAULT_RIDER: User = {
   id: 'rider_arman_01',
   name: 'Arman Ali',
-  email: 'arman@ridemesh.com',
+  email: 'arman@rydtrip.com',
   phone: '+91 98765 43210',
   role: 'RIDER',
   rating: 4.92,
@@ -24,7 +24,7 @@ const DEFAULT_RIDER: User = {
 const DEFAULT_DRIVER: User = {
   id: 'driver_rahul_01',
   name: 'Rahul Sharma',
-  email: 'rahul.driver@ridemesh.com',
+  email: 'rahul.driver@rydtrip.com',
   phone: '+91 91234 56789',
   role: 'DRIVER',
   rating: 4.88,
@@ -36,7 +36,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   role: 'RIDER',
   isAuthenticated: true,
 
-  loginAsRider: (name = 'Arman Ali', email = 'arman@ridemesh.com') => {
+  loginAsRider: (name = 'Arman Ali', email = 'arman@rydtrip.com') => {
     set({
       user: { ...DEFAULT_RIDER, name, email },
       role: 'RIDER',
@@ -44,7 +44,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  loginAsDriver: (name = 'Rahul Sharma', email = 'rahul.driver@ridemesh.com') => {
+  loginAsDriver: (name = 'Rahul Sharma', email = 'rahul.driver@rydtrip.com') => {
     set({
       user: { ...DEFAULT_DRIVER, name, email },
       role: 'DRIVER',

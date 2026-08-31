@@ -39,7 +39,7 @@ export const MarketingHome: React.FC = () => {
               <div className="relative overflow-hidden rounded-xl bg-canvas-soft shadow-card aspect-[4/3]">
                 <img
                   src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800&auto=format&fit=crop&q=80"
-                  alt="Uber Rider Experience"
+                  alt="RydTrip Rider Experience"
                   className="h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
@@ -170,7 +170,7 @@ export const MarketingHome: React.FC = () => {
               </div>
               <h3 className="font-display text-display-sm text-ink">Real-time matching engine</h3>
               <p className="text-body-md text-body">
-                Powered by RideMesh distributed dispatch, Redis GEO indexing, and low-latency WebSockets.
+                Powered by RydTrip distributed dispatch, Redis GEO indexing, and low-latency WebSockets.
               </p>
             </div>
           </div>
@@ -190,7 +190,7 @@ export const MarketingHome: React.FC = () => {
                   Next-generation dispatch & urban logistics
                 </h2>
                 <p className="text-body-lg text-canvas-soft/80 max-w-xl">
-                  Discover how RideMesh powers zero-emissions fleet dispatch, autonomous vehicle handoffs, and instant real-time driver tracking.
+                  Discover how RydTrip powers zero-emissions fleet dispatch, autonomous vehicle handoffs, and instant real-time driver tracking.
                 </p>
                 <div className="pt-2">
                   <Button variant="secondary" size="lg" onClick={() => navigate('/dual')}>

@@ -142,7 +142,7 @@ export const TripCompletedCard: React.FC<{ onNewRide: () => void }> = ({ onNewRi
 
       <div>
         <h2 className="font-display text-display-md text-ink">You have arrived!</h2>
-        <p className="text-body-sm text-body mt-1">Thank you for riding with Uber</p>
+        <p className="text-body-sm text-body mt-1">Thank you for riding with RydTrip</p>
       </div>
 
       <div className="rounded-xl bg-canvas-soft p-4 text-center space-y-1">

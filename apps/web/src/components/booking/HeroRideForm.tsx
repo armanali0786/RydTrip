@@ -98,7 +98,7 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
       </div>
 
       <h1 className="font-display text-display-xl font-bold text-ink mb-6 leading-tight">
-        Go anywhere with Uber
+        Go anywhere with RydTrip
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-3">

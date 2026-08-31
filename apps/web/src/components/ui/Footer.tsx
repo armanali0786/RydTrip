@@ -7,9 +7,9 @@ export const Footer: React.FC = () => {
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start mb-12 gap-8">
           <div>
-            <span className="font-display text-3xl font-bold tracking-tight text-on-dark">Uber</span>
+            <span className="font-display text-3xl font-bold tracking-tight text-on-dark">RydTrip</span>
             <p className="mt-2 text-body-sm text-hairline-mid max-w-sm">
-              RideMesh distributed logistics engine powering urban mobility, ride-hailing, and driver dispatch at scale.
+              RydTrip distributed logistics engine powering urban mobility, ride-hailing, and driver dispatch at scale.
             </p>
           </div>
 
@@ -45,7 +45,7 @@ export const Footer: React.FC = () => {
               <li><a href="#" className="hover:text-on-dark transition-colors">Drive</a></li>
               <li><a href="#" className="hover:text-on-dark transition-colors">Deliver</a></li>
               <li><a href="#" className="hover:text-on-dark transition-colors">Eat</a></li>
-              <li><a href="#" className="hover:text-on-dark transition-colors">Uber Freight</a></li>
+              <li><a href="#" className="hover:text-on-dark transition-colors">RydTrip Freight</a></li>
             </ul>
           </div>
 
@@ -70,7 +70,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom fine print */}
         <div className="pt-8 flex flex-col sm:flex-row justify-between items-center text-caption text-mute gap-4">
-          <p>© 2026 Uber Technologies Inc. / RideMesh Distributed Platform.</p>
+          <p>© 2026 RydTrip Technologies Inc. / Distributed Platform.</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-on-dark transition-colors">Privacy</a>
             <a href="#" className="hover:text-on-dark transition-colors">Accessibility</a>

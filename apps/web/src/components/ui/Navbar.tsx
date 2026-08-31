@@ -23,10 +23,10 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2">
             <span className="font-display text-[26px] tracking-tight text-on-dark hover:opacity-90 transition-opacity">
-              Uber
+              RydTrip
             </span>
             <span className="rounded-pill bg-canvas-soft/20 px-2 py-0.5 text-[10px] font-semibold text-canvas uppercase tracking-wider">
-              RideMesh
+              Platform
             </span>
           </Link>
 

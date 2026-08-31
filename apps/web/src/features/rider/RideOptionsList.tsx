@@ -92,7 +92,7 @@ export const RideOptionsList: React.FC<RideOptionsListProps> = ({
 
         <span className="text-caption text-mute flex items-center gap-1">
           <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-          RideMesh Safety Included
+          RydTrip Safety Included
         </span>
       </div>
 
