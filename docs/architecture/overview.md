@@ -99,6 +99,36 @@ being temporarily unavailable.
 - **Eventual consistency**: analytics, notifications, dashboards, and driver location
   propagation to anything other than the authoritative Redis GEO index.
 
+## Reliability model (Phase 8)
+
+Every Kafka consumer built on `libraries/event-schema`'s `EventConsumer` gets, for free:
+
+- **Retry with exponential backoff + full jitter** around the handler call (default 3
+  attempts) — for transient failures like a downstream service being briefly
+  unreachable, or a genuine cross-service race (e.g. `driver.accepted` arriving at Trip
+  Service before its own `ride.requested` consumer has committed the ride row).
+- **A Dead Letter Topic per consumer group** (`<groupId>.dlt`, auto-created — no extra
+  wiring per service) that a message lands on once retries are exhausted, carrying
+  enough metadata to diagnose without re-reading source code. See
+  [scripts/replay-dlq.ts](../../scripts/replay-dlq.ts) for replaying a parked message
+  once the underlying issue is fixed.
+
+**Idempotency** (surviving *duplicate* delivery, a separate concern from retrying a
+*failed* one) is owned by each handler, backed by whichever durable store that service
+already owns (ADR-004's per-service ownership, applied to this ledger too):
+
+- Trip Service checks/writes `processed_events` (Postgres) in the *same transaction* as
+  the ride update it guards, so a duplicate delivery and its side effect commit or roll
+  back together — see [data-model.md](data-model.md).
+- Dispatch Service, which owns no Postgres database, uses a Redis key
+  (`processed:{consumer}:{eventId}`) instead — see the Redis key space table in
+  [data-model.md](data-model.md).
+
+**Circuit breakers** (`libraries/circuit-breaker`, a plain in-house CLOSED/OPEN/HALF_OPEN
+state machine) wrap Dispatch Service's calls to Redis and to Driver Service's best-effort
+status sync, so a struggling dependency gets failed-fast against instead of every
+`ride.requested` event hanging on its own connection retry/timeout.
+
 ## Related documents
 
 - [state-machines.md](state-machines.md) — full ride and driver state machines

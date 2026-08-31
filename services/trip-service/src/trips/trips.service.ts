@@ -1,7 +1,10 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CancellationReason, Ride, RideStatus } from '@rydtrip/event-schema';
 import { assertValidRideTransition, InvalidRideTransitionError } from './ride-state-machine';
-import { CreateRideInput, TripsRepository } from './trips.repository';
+import { CreateRideInput, TripsRepository, TripsTx } from './trips.repository';
+
+/** Matches the Kafka consumer group id in ride-events.consumer.ts — the processed_events key. */
+const CONSUMER_NAME = 'trip-service';
 
 @Injectable()
 export class TripsService {
@@ -14,16 +17,33 @@ export class TripsService {
    * bridge). Dispatch Service (Phase 7) doesn't exist yet to do real
    * matching, so we advance REQUESTED -> MATCHING immediately — the guarded
    * transition Phase 7 will eventually drive from dispatch outcomes instead.
+   *
+   * `eventId` guards this against duplicate delivery (Phase 8) — both the
+   * ride creation and the MATCHING transition happen inside the same
+   * `processed_events`-checked transaction, so a replay is a clean no-op
+   * rather than a second ride row or a duplicate audit entry.
    */
-  async handleRideRequested(input: CreateRideInput): Promise<void> {
-    const ride = await this.repository.create(input);
-    await this.transitionTo(ride.id, RideStatus.MATCHING);
-    this.logger.log(`ride ${ride.id} created and advanced to MATCHING`);
+  async handleRideRequested(input: CreateRideInput, eventId: string): Promise<void> {
+    const outcome = await this.repository.runIdempotent(eventId, CONSUMER_NAME, async (tx) => {
+      const ride = await this.repository.create(input, tx);
+      // Always valid immediately after creation (REQUESTED -> MATCHING) — no
+      // guard check needed, unlike transitionTo()'s general case.
+      return this.repository.transition(ride.id, RideStatus.MATCHING, undefined, tx);
+    });
+    if (!outcome.processed) {
+      this.logger.log(`skipping duplicate delivery of ride.requested eventId=${eventId}`);
+      return;
+    }
+    this.logger.log(`ride ${outcome.result.id} created and advanced to MATCHING`);
   }
 
   /** Consumes ride.cancelled (Phase 5). See cancel() for the guard applied. */
-  async handleRideCancelled(rideId: string, reason?: CancellationReason): Promise<void> {
-    await this.cancel(rideId, reason);
+  async handleRideCancelled(rideId: string, reason: CancellationReason | undefined, eventId: string): Promise<void> {
+    const outcome = await this.repository.runIdempotent(eventId, CONSUMER_NAME, (tx) => this.cancel(rideId, reason, tx));
+    if (!outcome.processed) {
+      this.logger.log(`skipping duplicate delivery of ride.cancelled eventId=${eventId}`);
+      return;
+    }
     this.logger.log(`ride ${rideId} cancelled via event`);
   }
 
@@ -33,17 +53,29 @@ export class TripsService {
    * together as soon as Dispatch confirms a driver, which is what this event
    * represents (there's no separate human accept/reject step yet).
    */
-  async handleDriverAccepted(rideId: string, driverId: string): Promise<void> {
+  async handleDriverAccepted(rideId: string, driverId: string, eventId: string): Promise<void> {
     const ride = await this.findById(rideId);
     this.guardTransition(ride.status, RideStatus.MATCHED);
-    await this.repository.transition(rideId, RideStatus.MATCHED, { driverId });
-    await this.transitionTo(rideId, RideStatus.DRIVER_ARRIVING);
+    const outcome = await this.repository.runIdempotent(eventId, CONSUMER_NAME, async (tx) => {
+      await this.repository.transition(rideId, RideStatus.MATCHED, { driverId }, tx);
+      return this.repository.transition(rideId, RideStatus.DRIVER_ARRIVING, undefined, tx);
+    });
+    if (!outcome.processed) {
+      this.logger.log(`skipping duplicate delivery of driver.accepted eventId=${eventId}`);
+      return;
+    }
     this.logger.log(`ride ${rideId} matched with driver ${driverId}, advancing to DRIVER_ARRIVING`);
   }
 
   /** Consumes driver.rejected (Phase 7): Dispatch exhausted every candidate. */
-  async handleDriverRejected(rideId: string): Promise<void> {
-    await this.cancel(rideId, CancellationReason.NO_DRIVERS_AVAILABLE);
+  async handleDriverRejected(rideId: string, eventId: string): Promise<void> {
+    const outcome = await this.repository.runIdempotent(eventId, CONSUMER_NAME, (tx) =>
+      this.cancel(rideId, CancellationReason.NO_DRIVERS_AVAILABLE, tx),
+    );
+    if (!outcome.processed) {
+      this.logger.log(`skipping duplicate delivery of driver.rejected eventId=${eventId}`);
+      return;
+    }
     this.logger.log(`ride ${rideId} cancelled: no drivers available`);
   }
 
@@ -67,10 +99,10 @@ export class TripsService {
     return this.transitionTo(id, RideStatus.COMPLETED);
   }
 
-  async cancel(id: string, reason: CancellationReason = CancellationReason.RIDER_CANCELLED): Promise<Ride> {
+  async cancel(id: string, reason: CancellationReason = CancellationReason.RIDER_CANCELLED, tx?: TripsTx): Promise<Ride> {
     const ride = await this.findById(id);
     this.guardTransition(ride.status, RideStatus.CANCELLED);
-    return this.repository.transition(id, RideStatus.CANCELLED, { cancellationReason: reason });
+    return this.repository.transition(id, RideStatus.CANCELLED, { cancellationReason: reason }, tx);
   }
 
   private async transitionTo(id: string, to: RideStatus): Promise<Ride> {

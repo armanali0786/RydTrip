@@ -49,9 +49,13 @@ function isDriverRejectedPayload(payload: unknown): payload is DriverRejectedPay
  * resumes from the last committed offset rather than replaying everything
  * or losing anything in between.
  *
- * No idempotency guard and no Dead Letter Topic here yet — both are Phase 8.
- * A handler error is caught and logged so one bad message doesn't take down
- * the consumer loop, but it is not retried or parked anywhere yet.
+ * Idempotency (duplicate delivery of the same eventId) is guarded in
+ * TripsService/TripsRepository via the `processed_events` table (Phase 8).
+ * A handler error here is rethrown, not swallowed, so EventConsumer's
+ * retry-with-backoff + Dead Letter Topic wrapper (also Phase 8) can do its
+ * job — retrying transient failures a few times before parking a genuinely
+ * poison message on `trip-service.dlt` rather than looping forever or
+ * silently dropping it.
  */
 @Injectable()
 export class RideEventsConsumer implements OnModuleInit, OnModuleDestroy {
@@ -80,41 +84,34 @@ export class RideEventsConsumer implements OnModuleInit, OnModuleDestroy {
         `consumed ${envelope.eventType} eventId=${envelope.eventId} correlationId=${envelope.correlationId}`,
       );
 
-      try {
-        if (envelope.eventType === KAFKA_TOPICS.RIDE_REQUESTED) {
-          if (!isRideRequestedPayload(envelope.payload)) {
-            this.logger.error(`malformed ${KAFKA_TOPICS.RIDE_REQUESTED} payload, skipping eventId=${envelope.eventId}`);
-            return;
-          }
-          await this.tripsService.handleRideRequested({
+      if (envelope.eventType === KAFKA_TOPICS.RIDE_REQUESTED) {
+        if (!isRideRequestedPayload(envelope.payload)) {
+          throw new Error(`malformed ${KAFKA_TOPICS.RIDE_REQUESTED} payload for eventId=${envelope.eventId}`);
+        }
+        await this.tripsService.handleRideRequested(
+          {
             id: envelope.payload.rideId,
             riderId: envelope.payload.riderId,
             pickup: envelope.payload.pickup,
             destination: envelope.payload.destination,
-          });
-        } else if (envelope.eventType === KAFKA_TOPICS.RIDE_CANCELLED) {
-          if (!isRideCancelledPayload(envelope.payload)) {
-            this.logger.error(`malformed ${KAFKA_TOPICS.RIDE_CANCELLED} payload, skipping eventId=${envelope.eventId}`);
-            return;
-          }
-          await this.tripsService.handleRideCancelled(envelope.payload.rideId, envelope.payload.reason);
-        } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_ACCEPTED) {
-          if (!isDriverAcceptedPayload(envelope.payload)) {
-            this.logger.error(`malformed ${KAFKA_TOPICS.DRIVER_ACCEPTED} payload, skipping eventId=${envelope.eventId}`);
-            return;
-          }
-          await this.tripsService.handleDriverAccepted(envelope.payload.rideId, envelope.payload.driverId);
-        } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_REJECTED) {
-          if (!isDriverRejectedPayload(envelope.payload)) {
-            this.logger.error(`malformed ${KAFKA_TOPICS.DRIVER_REJECTED} payload, skipping eventId=${envelope.eventId}`);
-            return;
-          }
-          await this.tripsService.handleDriverRejected(envelope.payload.rideId);
-        }
-      } catch (err) {
-        this.logger.error(
-          `failed to handle ${envelope.eventType} correlationId=${envelope.correlationId}: ${(err as Error).message}`,
+          },
+          envelope.eventId,
         );
+      } else if (envelope.eventType === KAFKA_TOPICS.RIDE_CANCELLED) {
+        if (!isRideCancelledPayload(envelope.payload)) {
+          throw new Error(`malformed ${KAFKA_TOPICS.RIDE_CANCELLED} payload for eventId=${envelope.eventId}`);
+        }
+        await this.tripsService.handleRideCancelled(envelope.payload.rideId, envelope.payload.reason, envelope.eventId);
+      } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_ACCEPTED) {
+        if (!isDriverAcceptedPayload(envelope.payload)) {
+          throw new Error(`malformed ${KAFKA_TOPICS.DRIVER_ACCEPTED} payload for eventId=${envelope.eventId}`);
+        }
+        await this.tripsService.handleDriverAccepted(envelope.payload.rideId, envelope.payload.driverId, envelope.eventId);
+      } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_REJECTED) {
+        if (!isDriverRejectedPayload(envelope.payload)) {
+          throw new Error(`malformed ${KAFKA_TOPICS.DRIVER_REJECTED} payload for eventId=${envelope.eventId}`);
+        }
+        await this.tripsService.handleDriverRejected(envelope.payload.rideId, envelope.eventId);
       }
     });
   }

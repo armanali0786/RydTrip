@@ -3,7 +3,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { KafkaContainer, StartedKafkaContainer } from '@testcontainers/kafka';
 import { RedisContainer, StartedRedisContainer } from '@testcontainers/redis';
-import { createKafkaClient, EventConsumer, EventEnvelope } from '@rydtrip/event-schema';
+import { createKafkaClient, EventConsumer, EventEnvelope, KAFKA_TOPICS } from '@rydtrip/event-schema';
 import { DriverGeoIndex, DriverReservationStore } from '@rydtrip/redis-client';
 import Redis from 'ioredis';
 import request from 'supertest';
@@ -27,6 +27,8 @@ describe('Dispatch Service (e2e)', () => {
   let testRedis: Redis;
   let geoIndex: DriverGeoIndex;
   let reservations: DriverReservationStore;
+  let testKafka: ReturnType<typeof createKafkaClient>;
+  let rawProducer: ReturnType<typeof testKafka.producer>;
 
   beforeAll(async () => {
     redisContainer = await new RedisContainer('redis:7-alpine').start();
@@ -42,6 +44,9 @@ describe('Dispatch Service (e2e)', () => {
     testRedis = new Redis(process.env.REDIS_URL);
     geoIndex = new DriverGeoIndex(testRedis);
     reservations = new DriverReservationStore(testRedis);
+    testKafka = createKafkaClient({ clientId: 'test-raw-producer', brokers: [bootstrapServers(kafka)] });
+    rawProducer = testKafka.producer();
+    await rawProducer.connect();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -49,6 +54,7 @@ describe('Dispatch Service (e2e)', () => {
   });
 
   afterAll(async () => {
+    await rawProducer.disconnect();
     await app.close();
     testRedis.disconnect();
     await redisContainer.stop();
@@ -202,6 +208,128 @@ describe('Dispatch Service (e2e)', () => {
       expect(finalReservation).toBe(winner);
 
       await consumer.disconnect();
+    },
+    30000,
+  );
+
+  it(
+    'exit criterion: replaying the same ride.requested event 3x through the real consumer results in exactly one dispatch outcome',
+    async () => {
+      const driverId = randomUUID();
+      const rideId = randomUUID();
+      const eventId = randomUUID();
+      await geoIndex.upsertLocation(driverId, NEARBY_POINT.lat, NEARBY_POINT.lng, 60);
+
+      const sentEnvelope: EventEnvelope = {
+        eventId,
+        eventType: KAFKA_TOPICS.RIDE_REQUESTED,
+        version: 1,
+        timestamp: new Date().toISOString(),
+        correlationId: randomUUID(),
+        producer: 'test-harness',
+        payload: { rideId, riderId: randomUUID(), pickup: ORIGIN, destination: ORIGIN },
+      };
+
+      const testConsumerKafka = createKafkaClient({ clientId: 'test-consumer-5', brokers: [bootstrapServers(kafka)] });
+      const consumer = new EventConsumer(testConsumerKafka, `test-${randomUUID()}`);
+      await consumer.connect();
+      await consumer.subscribe(['driver.accepted', 'driver.rejected']);
+
+      const outcomesForRide: EventEnvelope[] = [];
+      void consumer.run(async (received) => {
+        if ((received.payload as { rideId?: string }).rideId === rideId) {
+          outcomesForRide.push(received);
+        }
+      });
+
+      // Same eventId, sent as 3 separate Kafka messages — simulating
+      // redelivery of the identical event, which the real RideRequestedConsumer
+      // (going through its own Kafka subscription, not a direct method call)
+      // must collapse into exactly one dispatch outcome.
+      for (let i = 0; i < 3; i++) {
+        await rawProducer.send({
+          topic: KAFKA_TOPICS.RIDE_REQUESTED,
+          messages: [{ key: rideId, value: JSON.stringify(sentEnvelope) }],
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+      // Exactly one outcome from 3 identical deliveries is the idempotency
+      // guarantee under test — which driver wins doesn't matter here (other
+      // tests in this suite share the same GEO coordinates and may have
+      // left their own still-live candidates nearby), so assert internal
+      // consistency (the winning driver actually holds this ride's
+      // reservation) rather than assuming this test's own seeded driver wins.
+      expect(outcomesForRide).toHaveLength(1);
+      expect(outcomesForRide[0].eventType).toBe('driver.accepted');
+      const winningDriverId = (outcomesForRide[0].payload as { driverId: string }).driverId;
+
+      const reservedFor = await reservations.getReservation(winningDriverId);
+      expect(reservedFor).toBe(rideId);
+
+      await consumer.disconnect();
+    },
+    30000,
+  );
+
+  it(
+    'exit criterion: a poison ride.requested payload is retried then parked on dispatch-service.dlt with diagnostic metadata',
+    async () => {
+      const dlqConsumerKafka = createKafkaClient({ clientId: 'test-dlq-consumer', brokers: [bootstrapServers(kafka)] });
+      // dispatch-service.dlt is created lazily (see EventConsumer.ensureDlqTopic) —
+      // only the first time a message is actually parked, not eagerly at consumer
+      // startup — so it may not exist yet. Pre-create it explicitly, the same way
+      // any operator tailing a DLQ topic ahead of time would have to.
+      const dlqAdmin = dlqConsumerKafka.admin();
+      await dlqAdmin.connect();
+      await dlqAdmin.createTopics({ topics: [{ topic: 'dispatch-service.dlt', numPartitions: 1, replicationFactor: 1 }], waitForLeaders: true });
+      await dlqAdmin.disconnect();
+
+      const dlqConsumer = dlqConsumerKafka.consumer({ groupId: `test-dlq-${randomUUID()}` });
+      await dlqConsumer.connect();
+      await dlqConsumer.subscribe({ topic: 'dispatch-service.dlt', fromBeginning: true });
+
+      const correlationId = randomUUID();
+      const received = new Promise<Record<string, unknown>>((resolve) => {
+        void dlqConsumer.run({
+          eachMessage: async ({ message }) => {
+            const record = JSON.parse(message.value!.toString()) as Record<string, unknown>;
+            const envelope = record.envelope as EventEnvelope | null;
+            if (envelope?.correlationId === correlationId) {
+              resolve(record);
+            }
+          },
+        });
+      });
+
+      await rawProducer.send({
+        topic: KAFKA_TOPICS.RIDE_REQUESTED,
+        messages: [
+          {
+            value: JSON.stringify({
+              eventId: randomUUID(),
+              eventType: KAFKA_TOPICS.RIDE_REQUESTED,
+              version: 1,
+              timestamp: new Date().toISOString(),
+              correlationId,
+              producer: 'test-harness',
+              payload: { not: 'a valid payload' },
+            }),
+          },
+        ],
+      });
+
+      const record = await received;
+      expect(record.dlqReason).toBe('handler-failed');
+      expect(record.consumerGroup).toBe('dispatch-service');
+      expect(record.originalTopic).toBe(KAFKA_TOPICS.RIDE_REQUESTED);
+      expect(record.attempts).toBe(3);
+      expect(record.errorMessage).toContain('malformed');
+
+      await request(app.getHttpServer()).get('/health/live').expect(200);
+
+      await dlqConsumer.disconnect();
     },
     30000,
   );

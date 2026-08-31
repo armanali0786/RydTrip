@@ -15,6 +15,7 @@
     "@nestjs/core": "^10.4.15",
     "@nestjs/platform-express": "^10.4.15",
     "@nestjs/swagger": "^8.1.1",
+    "@rydtrip/circuit-breaker": "*",
     "@rydtrip/event-schema": "*",
     "@rydtrip/redis-client": "*",
     "reflect-metadata": "^0.2.2",

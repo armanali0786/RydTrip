@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { CancellationReason, GeoPoint, Ride, RideStatus } from '@rydtrip/event-schema';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '../../prisma-client';
 import type { Ride as RideRow } from '../../prisma-client';
+
+/** The Prisma client type available inside a `$transaction` callback. */
+export type TripsTx = Prisma.TransactionClient;
+
+export type IdempotentOutcome<T> = { processed: false } | { processed: true; result: T };
 
 export interface CreateRideInput {
   /** Provided by the ride.requested event's payload — Rider Service, not this repository, mints the id. */
@@ -58,9 +64,35 @@ function eventTypeForStatus(status: RideStatus): string {
 export class TripsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(input: CreateRideInput): Promise<Ride> {
-    const row = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.ride.create({
+  /**
+   * Runs `work` inside a transaction guarded by a `processed_events` insert
+   * for (eventId, consumerName) — the insert happens first, so if this
+   * (eventId, consumerName) pair was already processed the unique
+   * constraint on `processed_events` throws, the whole transaction (side
+   * effects included) rolls back untouched, and this returns
+   * `{ processed: false }` instead of re-running `work`. This is what makes
+   * replaying the same Kafka event N times produce exactly one business
+   * side effect (Phase 8) — the guard and the side effect commit or roll
+   * back together, not as two separate writes that could race or half-apply.
+   */
+  async runIdempotent<T>(eventId: string, consumerName: string, work: (tx: TripsTx) => Promise<T>): Promise<IdempotentOutcome<T>> {
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        await tx.processedEvent.create({ data: { eventId, consumerName } });
+        return work(tx);
+      });
+      return { processed: true, result };
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        return { processed: false };
+      }
+      throw err;
+    }
+  }
+
+  async create(input: CreateRideInput, tx?: TripsTx): Promise<Ride> {
+    const exec = async (client: TripsTx | PrismaService) => {
+      const created = await client.ride.create({
         data: {
           id: input.id,
           riderId: input.riderId,
@@ -71,7 +103,7 @@ export class TripsRepository {
           status: RideStatus.REQUESTED,
         },
       });
-      await tx.tripEvent.create({
+      await client.tripEvent.create({
         data: {
           rideId: created.id,
           eventType: eventTypeForStatus(RideStatus.REQUESTED),
@@ -79,7 +111,8 @@ export class TripsRepository {
         },
       });
       return created;
-    });
+    };
+    const row = tx ? await exec(tx) : await this.prisma.$transaction((innerTx) => exec(innerTx));
     return toDomain(row);
   }
 
@@ -93,9 +126,10 @@ export class TripsRepository {
     id: string,
     to: RideStatus,
     options?: { cancellationReason?: CancellationReason; driverId?: string },
+    tx?: TripsTx,
   ): Promise<Ride> {
-    const row = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.ride.update({
+    const exec = async (client: TripsTx | PrismaService) => {
+      const updated = await client.ride.update({
         where: { id },
         data: {
           status: to,
@@ -103,7 +137,7 @@ export class TripsRepository {
           ...(options?.driverId ? { driverId: options.driverId } : {}),
         },
       });
-      await tx.tripEvent.create({
+      await client.tripEvent.create({
         data: {
           rideId: id,
           eventType: eventTypeForStatus(to),
@@ -112,7 +146,8 @@ export class TripsRepository {
         },
       });
       return updated;
-    });
+    };
+    const row = tx ? await exec(tx) : await this.prisma.$transaction((innerTx) => exec(innerTx));
     return toDomain(row);
   }
 }

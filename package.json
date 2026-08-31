@@ -17,7 +17,8 @@
     "dev:driver": "npm run dev --workspace=@rydtrip/driver-web",
     "build": "npm run build --workspace=@rydtrip/web",
     "lint": "echo \"Linting passes\"",
-    "test": "echo \"Testing passes\""
+    "test": "echo \"Testing passes\"",
+    "replay-dlq": "ts-node --transpile-only scripts/replay-dlq.ts"
   },
   "license": "MIT"
 }

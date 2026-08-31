@@ -101,6 +101,25 @@ run it locally against the same Postgres: copy `services/<service>/.env.example`
 [`docs/roadmap/PHASES.md`](docs/roadmap/PHASES.md) for what each phase actually built and
 its exit criteria.
 
+## Reliability (Phase 8)
+
+Every Kafka consumer retries transient failures (exponential backoff + jitter) and, once
+retries are exhausted, parks the message on a per-consumer-group Dead Letter Topic
+(`<group>.dlt`) instead of blocking the partition or dropping it silently. Idempotency
+guards against duplicate delivery separately (Postgres `processed_events` for Trip
+Service, a Redis key for Dispatch Service, which has no Postgres of its own). See
+[`docs/architecture/overview.md`](docs/architecture/overview.md#reliability-model-phase-8)
+for the full model.
+
+To inspect or replay whatever's sitting on a Dead Letter Topic (after fixing whatever
+made it fail):
+
+```bash
+npm run build --workspace=libraries/event-schema  # required once — the script imports it
+npm run replay-dlq -- --topic trip-service.dlt --dry-run
+npm run replay-dlq -- --topic trip-service.dlt
+```
+
 ## License
 
 See [`LICENSE`](LICENSE).

@@ -20,7 +20,7 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 | 5 | Kafka + Event-Driven Architecture | 🟢 Done | 4 |
 | 6 | Redis + GEO | 🟢 Done | 5 |
 | 7 | Dispatch / Matching Engine | 🟢 Done | 6 |
-| 8 | Reliability + Distributed Systems | ⚪ Not started | 7 |
+| 8 | Reliability + Distributed Systems | 🟢 Done | 7 |
 | 9 | Kubernetes (local) | ⚪ Not started | 8 |
 | 10 | Observability | ⚪ Not started | 9 |
 | 11 | Security | ⚪ Not started | 10 |
@@ -210,14 +210,63 @@ Exit criteria:
 **Goal:** the system tolerates the failure modes it will actually see.
 
 Deliverables:
-- Idempotent consumers via `processed_events` table (dedupe by eventId)
-- Retry with exponential backoff + jitter on transient failures
-- Dead Letter Topic per consumer group + replay tooling
-- Circuit breaker around Redis/Postgres calls from Dispatch
+- **Idempotent consumers.** Trip Service dedupes by `(eventId, consumerName)` against its
+  own `processed_events` table (Postgres) — `TripsRepository.runIdempotent()` inserts the
+  guard row as the *first* statement of the same transaction that applies the event's
+  side effects, so a duplicate delivery and the write it guards commit or roll back
+  together, not as two separate writes that could race. Dispatch Service, which owns no
+  Postgres database, uses an equivalent Redis-backed ledger instead
+  (`libraries/redis-client`'s `IdempotencyStore`, key `processed:{consumer}:{eventId}`) —
+  checked before, marked after `handleRideRequested()` succeeds; correct because a single
+  Kafka partition is only ever consumed by one process at a time, so there's no
+  concurrent duplicate processing to race against, only sequential *redelivery*.
+- **Retry with exponential backoff + full jitter**, built directly into
+  `libraries/event-schema`'s `EventConsumer.run()` — generic to every consumer on top of
+  it, no per-service wiring needed. Default 3 attempts, delay capped and randomized per
+  attempt (`Math.random() * min(maxDelayMs, baseDelayMs * 2^(attempt-1))`).
+- **A Dead Letter Topic per consumer group**, also built into `EventConsumer` —
+  `<groupId>.dlt` (`trip-service.dlt`, `dispatch-service.dlt`), auto-created alongside a
+  consumer's regular subscriptions. A message lands there after exhausting retries, or
+  immediately if its JSON can't be parsed at all. Each record carries the original
+  topic/partition/offset/key, the parsed envelope (when there is one), the error message,
+  attempt count, and a timestamp — see [data-model.md](../architecture/data-model.md)'s
+  "Kafka Dead Letter Topics" section for the exact shape.
+- **Replay tooling**: [scripts/replay-dlq.ts](../../scripts/replay-dlq.ts)
+  (`npm run replay-dlq -- --topic <group>.dlt`) reads every record currently on a DLT and
+  republishes each one's original envelope back onto its original topic.
+- **Circuit breaker around Dispatch's Redis/driver-service calls**: a plain in-house
+  CLOSED/OPEN/HALF_OPEN state machine (`libraries/circuit-breaker`, unit-tested on its
+  own — no external dependency, same reasoning as `DriverReservationStore`'s atomic
+  `SET NX` over a Lua script). `DispatchService` wraps its GEO lookup + reservation calls
+  in one breaker and the best-effort Driver Service HTTP status sync in another, so a
+  genuinely down dependency gets failed fast instead of every `ride.requested` event
+  hanging on its own connection retry/timeout.
 
 Exit criteria:
-- [ ] Replaying the same Kafka event 3x results in exactly one business-side effect
-- [ ] A poison event lands in the DLT with enough metadata to diagnose without re-reading source code
+- [x] Replaying the same Kafka event 3x results in exactly one business-side effect —
+  verified for both idempotency backends: `trips.e2e-spec.ts`'s
+  "replaying the same ride.requested event 3x..." test (Postgres-backed, asserts exactly
+  one ride + one audit-trail pair + `processed_events` row) passes reliably. For the
+  Redis-backed path, `dispatch.e2e-spec.ts` has the equivalent test, but the
+  Testcontainers-based dispatch-service e2e suite is currently flaky on this dev
+  machine under heavy *unrelated* host load (a separate multi-node `kind` cluster plus
+  other local work competing for CPU) — symptoms start at Kafka group-coordinator join
+  during `beforeAll`, before any test logic runs, and disappear when run against a
+  stable long-lived broker instead. So this one was additionally verified live: running
+  the real dispatch-service against the project's long-lived docker-compose Kafka/Redis
+  and publishing the same `eventId` 3x produced exactly one `[DispatchService] ride ...
+  matched with driver ...` log line, with the other two deliveries logged as
+  `[RideRequestedConsumer] skipping duplicate delivery of ride.requested eventId=...` —
+  and a Redis reservation belonging to that one ride, confirming both consumed events
+  were the same 3, and the side effect happened exactly once.
+- [x] A poison event lands in the DLT with enough metadata to diagnose without
+  re-reading source code — verified live: `trips.e2e-spec.ts` and
+  `dispatch.e2e-spec.ts` each publish a malformed `ride.requested` payload and assert the
+  resulting `<group>.dlt` record's `dlqReason`, `consumerGroup`, `originalTopic`,
+  `attempts` (3), and `errorMessage` fields; the trip-service run's own log captured it
+  live: `[EventConsumer:trip-service] parked message from ride.requested on
+  trip-service.dlt after 3 attempt(s): malformed ride.requested payload for
+  eventId=...`. Independently reproduced against dispatch-service running live too.
 
 ---
 

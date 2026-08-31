@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CircuitBreaker } from '@rydtrip/circuit-breaker';
 import { CancellationReason, DriverStatus, GeoPoint, KAFKA_TOPICS } from '@rydtrip/event-schema';
 import { KafkaPublisherService } from '../kafka/kafka-publisher.service';
 import { RedisService } from '../redis/redis.service';
@@ -7,6 +8,8 @@ const DEFAULTS = {
   searchRadiusKm: 5,
   candidateLimit: 5,
   reservationTtlSeconds: 30,
+  circuitFailureThreshold: 5,
+  circuitResetTimeoutMs: 10_000,
 };
 
 /**
@@ -22,8 +25,21 @@ const DEFAULTS = {
  * Redis reservation, not as part of the same atomic operation — Redis is the
  * hot-path source of truth for "who won"; Postgres is the durable/audit
  * mirror (see data-model.md's note on the `status` index). A failed sync
- * doesn't unwind the reservation; that kind of cross-system compensation is
- * Phase 8 (Reliability) territory, not this phase's stated goal.
+ * doesn't unwind the reservation — this is an intentional, permanent
+ * best-effort design choice (real cross-system compensation/sagas are out of
+ * scope for this project), not a placeholder for something more.
+ *
+ * Phase 8 wraps both of dispatch's external dependencies in their own
+ * CircuitBreaker: `redisBreaker` around the GEO lookup + reservation calls,
+ * `driverServiceBreaker` around the best-effort HTTP sync. If Redis is
+ * genuinely down, redisBreaker fails fast (CircuitOpenError) instead of
+ * letting every ride.requested event individually hang on ioredis's own
+ * connection retries — that thrown error is exactly what
+ * RideRequestedConsumer needs to trigger EventConsumer's retry-with-backoff
+ * (a real Redis outage is the transient-failure case that deliverable
+ * exists for). driverServiceBreaker just shortens an already best-effort,
+ * already-caught failure — it never changes what handleRideRequested
+ * returns.
  */
 @Injectable()
 export class DispatchService {
@@ -33,6 +49,14 @@ export class DispatchService {
   private readonly reservationTtlSeconds =
     Number(process.env.RESERVATION_TTL_SECONDS) || DEFAULTS.reservationTtlSeconds;
   private readonly driverServiceUrl = process.env.DRIVER_SERVICE_URL ?? 'http://localhost:3002';
+  private readonly redisBreaker = new CircuitBreaker('dispatch-redis', {
+    failureThreshold: Number(process.env.DISPATCH_CIRCUIT_FAILURE_THRESHOLD) || DEFAULTS.circuitFailureThreshold,
+    resetTimeoutMs: Number(process.env.DISPATCH_CIRCUIT_RESET_TIMEOUT_MS) || DEFAULTS.circuitResetTimeoutMs,
+  });
+  private readonly driverServiceBreaker = new CircuitBreaker('dispatch-driver-service-sync', {
+    failureThreshold: Number(process.env.DISPATCH_CIRCUIT_FAILURE_THRESHOLD) || DEFAULTS.circuitFailureThreshold,
+    resetTimeoutMs: Number(process.env.DISPATCH_CIRCUIT_RESET_TIMEOUT_MS) || DEFAULTS.circuitResetTimeoutMs,
+  });
 
   constructor(
     private readonly redis: RedisService,
@@ -40,15 +64,14 @@ export class DispatchService {
   ) {}
 
   async handleRideRequested(rideId: string, pickup: GeoPoint, correlationId: string): Promise<void> {
-    const candidates = await this.redis.geoIndex.findNearby(
-      pickup.lat,
-      pickup.lng,
-      this.searchRadiusKm,
-      this.candidateLimit,
+    const candidates = await this.redisBreaker.execute(() =>
+      this.redis.geoIndex.findNearby(pickup.lat, pickup.lng, this.searchRadiusKm, this.candidateLimit),
     );
 
     for (const candidate of candidates) {
-      const won = await this.redis.reservations.tryReserve(candidate.driverId, rideId, this.reservationTtlSeconds);
+      const won = await this.redisBreaker.execute(() =>
+        this.redis.reservations.tryReserve(candidate.driverId, rideId, this.reservationTtlSeconds),
+      );
       if (!won) {
         this.logger.log(`lost reservation race for driver ${candidate.driverId}, ride ${rideId} — trying next candidate`);
         continue;
@@ -86,16 +109,18 @@ export class DispatchService {
 
   private async syncDriverStatusBestEffort(driverId: string): Promise<void> {
     try {
-      const res = await fetch(`${this.driverServiceUrl}/drivers/${driverId}/status`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ status: DriverStatus.RESERVED }),
+      await this.driverServiceBreaker.execute(async () => {
+        const res = await fetch(`${this.driverServiceUrl}/drivers/${driverId}/status`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ status: DriverStatus.RESERVED }),
+        });
+        if (!res.ok) {
+          throw new Error(`driver-service rejected status sync for ${driverId}: HTTP ${res.status}`);
+        }
       });
-      if (!res.ok) {
-        this.logger.warn(`driver-service rejected status sync for ${driverId}: HTTP ${res.status}`);
-      }
     } catch (err) {
-      this.logger.warn(`driver-service unreachable syncing status for ${driverId}: ${(err as Error).message}`);
+      this.logger.warn(`best-effort driver status sync skipped for ${driverId}: ${(err as Error).message}`);
     }
   }
 }

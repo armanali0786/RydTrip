@@ -4,7 +4,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { KafkaContainer, StartedKafkaContainer } from '@testcontainers/kafka';
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql';
-import { createKafkaClient, EventPublisher, KAFKA_TOPICS } from '@rydtrip/event-schema';
+import { createKafkaClient, EventEnvelope, EventPublisher, KAFKA_TOPICS } from '@rydtrip/event-schema';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -37,6 +37,8 @@ describe('Trip Service (e2e)', () => {
   let kafka: StartedKafkaContainer;
   let app: INestApplication;
   let publisher: EventPublisher;
+  let testKafka: ReturnType<typeof createKafkaClient>;
+  let rawProducer: ReturnType<typeof testKafka.producer>;
 
   const tripPayload = (rideId: string) => ({
     rideId,
@@ -58,9 +60,11 @@ describe('Trip Service (e2e)', () => {
 
     execSync('npx prisma migrate deploy', { env: { ...process.env }, stdio: 'inherit' });
 
-    const testKafka = createKafkaClient({ clientId: 'test-publisher', brokers: [bootstrapServers(kafka)] });
+    testKafka = createKafkaClient({ clientId: 'test-publisher', brokers: [bootstrapServers(kafka)] });
     publisher = new EventPublisher(testKafka, 'test-harness');
     await publisher.connect();
+    rawProducer = testKafka.producer();
+    await rawProducer.connect();
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
@@ -70,6 +74,7 @@ describe('Trip Service (e2e)', () => {
 
   afterAll(async () => {
     await publisher.disconnect();
+    await rawProducer.disconnect();
     await app.close();
     await pg.stop();
     await kafka.stop();
@@ -188,16 +193,97 @@ describe('Trip Service (e2e)', () => {
     expect(res.body.cancellationReason).toBe('NO_DRIVERS_AVAILABLE');
   });
 
-  it('a malformed ride.requested payload is logged and skipped, not crashed on', async () => {
-    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, { not: 'a valid payload' }, {
-      correlationId: randomUUID(),
-    });
+  it(
+    'exit criterion: a poison ride.requested payload is retried then parked on trip-service.dlt with diagnostic metadata, without crashing the consumer loop',
+    async () => {
+      // trip-service.dlt is created lazily (see EventConsumer.ensureDlqTopic) —
+      // only the first time a message is actually parked, not eagerly at consumer
+      // startup — so it may not exist yet. Pre-create it explicitly, the same way
+      // any operator tailing a DLQ topic ahead of time would have to.
+      const dlqAdmin = testKafka.admin();
+      await dlqAdmin.connect();
+      await dlqAdmin.createTopics({ topics: [{ topic: 'trip-service.dlt', numPartitions: 1, replicationFactor: 1 }], waitForLeaders: true });
+      await dlqAdmin.disconnect();
 
-    // The consumer loop must survive a poison message — proven by the app
-    // still answering a totally unrelated request right after.
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    await request(app.getHttpServer()).get('/health/live').expect(200);
-  });
+      const dlqConsumer = testKafka.consumer({ groupId: `test-dlq-${randomUUID()}` });
+      await dlqConsumer.connect();
+      await dlqConsumer.subscribe({ topic: 'trip-service.dlt', fromBeginning: true });
+
+      const correlationId = randomUUID();
+      const received = new Promise<Record<string, unknown>>((resolve) => {
+        void dlqConsumer.run({
+          eachMessage: async ({ message }) => {
+            const record = JSON.parse(message.value!.toString()) as Record<string, unknown>;
+            const envelope = record.envelope as EventEnvelope | null;
+            if (envelope?.correlationId === correlationId) {
+              resolve(record);
+            }
+          },
+        });
+      });
+
+      await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, { not: 'a valid payload' }, {
+        correlationId,
+      });
+
+      const record = await received;
+      expect(record.dlqReason).toBe('handler-failed');
+      expect(record.consumerGroup).toBe('trip-service');
+      expect(record.originalTopic).toBe(KAFKA_TOPICS.RIDE_REQUESTED);
+      expect(record.attempts).toBe(3);
+      expect(typeof record.errorMessage).toBe('string');
+      expect(record.errorMessage).toContain('malformed');
+
+      // The consumer loop must survive a poison message — proven by the app
+      // still answering a totally unrelated request right after.
+      await request(app.getHttpServer()).get('/health/live').expect(200);
+
+      await dlqConsumer.disconnect();
+    },
+    30000,
+  );
+
+  it(
+    'exit criterion: replaying the same ride.requested event 3x results in exactly one ride and one audit trail, not three',
+    async () => {
+      const rideId = randomUUID();
+      const eventId = randomUUID();
+      const envelope: EventEnvelope = {
+        eventId,
+        eventType: KAFKA_TOPICS.RIDE_REQUESTED,
+        version: 1,
+        timestamp: new Date().toISOString(),
+        correlationId: randomUUID(),
+        producer: 'test-harness',
+        payload: tripPayload(rideId),
+      };
+
+      for (let i = 0; i < 3; i++) {
+        await rawProducer.send({
+          topic: KAFKA_TOPICS.RIDE_REQUESTED,
+          messages: [{ key: rideId, value: JSON.stringify(envelope) }],
+        });
+      }
+
+      const res = await waitFor(
+        () => getTrip(rideId),
+        (r) => r.status === 200 && r.body.status === 'MATCHING',
+      );
+      expect(res.body.id).toBe(rideId);
+
+      // Give the two duplicate deliveries time to be consumed (they should
+      // be no-ops) before asserting nothing extra was written.
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const prisma = app.get(PrismaService);
+      const events = await prisma.tripEvent.findMany({ where: { rideId } });
+      expect(events.map((e) => e.eventType).sort()).toEqual(['ride.matching', 'ride.requested'].sort());
+
+      const processedCount = await prisma.processedEvent.count({ where: { eventId } });
+      expect(processedCount).toBe(1);
+    },
+    30000,
+  );
 
   it(
     'exit criterion: killing the consumer and restarting it resumes from the committed offset with no message loss',
