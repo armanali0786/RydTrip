@@ -10,7 +10,7 @@ sit behind the API Gateway.
 |---|---|
 | `/api/v1/riders`, `/api/v1/rides` | Rider Service |
 | `/api/v1/drivers/*/status` | Driver Service |
-| `/api/v1/drivers/*/location` | Location Service (Phase 6+; until then, no-op) |
+| `/api/v1/drivers/*/location` | Location Service (Phase 6) |
 | `/api/v1/trips` | Trip Service |
 
 Every request gets a `correlationId` injected by the Gateway if the client didn't
@@ -40,6 +40,16 @@ supply one, per the event envelope defined in [ADR-003](../adr/003-rest-vs-event
 Reservation/acceptance transitions (`AVAILABLE → RESERVED → ON_TRIP`) are **not**
 triggered by a direct client call — they're driven by Dispatch Service reacting to
 Kafka events (Phase 7), not exposed as a public endpoint.
+
+## Location Service (Phase 6)
+
+Not in the original Phase 1 sketch — Redis GEO didn't exist yet. Owns the only Redis
+GEO writes; holds no Postgres data of its own (see [overview.md](overview.md)).
+
+| Method | Path | Purpose | Key response fields |
+|---|---|---|---|
+| `POST` | `/drivers/{driverId}/location` | Driver location ping — writes Redis GEO + refreshes the heartbeat TTL, publishes `driver.location.updated` | `driverId`, `status` (`ACCEPTED`) — returns immediately |
+| `GET` | `/drivers/nearby` | Nearby drivers via `GEOSEARCH`, ranked by distance (added to demonstrate the Phase 6 exit criteria; Dispatch Service becomes its real caller in Phase 7) | list of `{ driverId, lat, lng, distanceKm }`, ascending by distance |
 
 ## Trip Service
 

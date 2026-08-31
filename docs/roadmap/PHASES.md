@@ -17,8 +17,8 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 | 2 | NestJS + Microservices Foundation | 🟢 Done | 1 |
 | 3 | PostgreSQL + Prisma | 🟢 Done | 2 |
 | 4 | Docker + Local Infrastructure | 🟢 Done | 3 |
-| 5 | Kafka + Event-Driven Architecture | ⚪ Not started | 4 |
-| 6 | Redis + GEO | ⚪ Not started | 5 |
+| 5 | Kafka + Event-Driven Architecture | 🟢 Done | 4 |
+| 6 | Redis + GEO | 🟢 Done | 5 |
 | 7 | Dispatch / Matching Engine | ⚪ Not started | 6 |
 | 8 | Reliability + Distributed Systems | ⚪ Not started | 7 |
 | 9 | Kubernetes (local) | ⚪ Not started | 8 |
@@ -167,8 +167,8 @@ Deliverables:
 - Trip Service consumes and reacts
 
 Exit criteria:
-- [ ] Killing a consumer and restarting it resumes from committed offset with no message loss (demoed, not just claimed)
-- [ ] Correlation ID present end-to-end in logs across the event chain
+- [x] Killing a consumer and restarting it resumes from committed offset with no message loss (demoed, not just claimed) — `services/trip-service/test/trips.e2e-spec.ts`: publishes more events while the consumer is down, restarts it (same consumer group), confirms nothing was lost
+- [x] Correlation ID present end-to-end in logs across the event chain — verified via a dedicated consumer asserting the same correlation id from publish through consumption in `services/rider-service/test/riders.e2e-spec.ts`
 
 ---
 
@@ -177,13 +177,14 @@ Exit criteria:
 **Goal:** low-latency driver location and state, independent of Postgres.
 
 Deliverables:
-- `services/location-service`: `POST /drivers/:id/location`, writes to Redis GEO + publishes `driver.location.updated`
-- `driver:{id}:state` hash with TTL-based staleness (heartbeat expiry → STALE)
-- ioredis client wrapper in `libraries/observability` or a new `libraries/redis-client`
+- `services/location-service`: `POST /drivers/:id/location` writes the driver's position into Redis GEO and publishes `driver.location.updated`. Also adds `GET /drivers/nearby` (not in the original Phase 1 [api-contracts.md](../architecture/api-contracts.md) sketch) so GEOSEARCH correctness is demonstrable now, ahead of Dispatch Service (Phase 7) becoming its real consumer.
+- `driver:{id}:state` hash with TTL-based staleness: Redis GEO has no per-member TTL, so each location update also refreshes this hash's `EXPIRE` (the heartbeat). `findNearby()` post-filters GEOSEARCH candidates against this hash and lazily evicts any whose heartbeat has lapsed — see [`libraries/redis-client/src/driver-geo-index.ts`](../../libraries/redis-client/src/driver-geo-index.ts).
+- `libraries/redis-client`: ioredis client wrapper + `DriverGeoIndex`.
+- API Gateway: `/drivers/:id/location` now routes to Location Service (pattern-matched ahead of the general `/drivers` prefix, which still goes to Driver Service) instead of the Phase 5 "no route configured" 404.
 
 Exit criteria:
-- [ ] `GEOSEARCH` returns correct nearby drivers for a known synthetic dataset
-- [ ] A driver whose heartbeat TTL expires is excluded from search results
+- [x] `GEOSEARCH` returns correct nearby drivers for a known synthetic dataset — verified live against a real Redis instance: a close driver (~0.2m) and a nearby driver (~0.5km) are both returned ranked by ascending distance, a far driver (~40km) is correctly excluded from a 5km radius search
+- [x] A driver whose heartbeat TTL expires is excluded from search results — verified live: a driver is present in `GET /drivers/nearby` immediately after posting a location, then absent after its heartbeat TTL lapses, with no explicit "go offline" call
 
 ---
 

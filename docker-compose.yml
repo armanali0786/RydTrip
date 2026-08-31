@@ -50,6 +50,18 @@ services:
       kafka:
         condition: service_healthy
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      # Host port defaults to 6380, not 6379 — this dev machine already has a
+      # local Redis on 6379 (same reasoning as Postgres's 5433 default).
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   rider-service:
     build:
       context: .
@@ -114,6 +126,28 @@ services:
       timeout: 5s
       retries: 10
 
+  location-service:
+    build:
+      context: .
+      dockerfile: services/location-service/Dockerfile
+    environment:
+      PORT: 3004
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      DRIVER_HEARTBEAT_TTL_SECONDS: 30
+    ports:
+      - "${LOCATION_HOST_PORT:-3004}:3004"
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3004/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api-gateway:
     build:
       context: .
@@ -123,6 +157,7 @@ services:
       RIDER_SERVICE_URL: http://rider-service:3001
       DRIVER_SERVICE_URL: http://driver-service:3002
       TRIP_SERVICE_URL: http://trip-service:3003
+      LOCATION_SERVICE_URL: http://location-service:3004
       JWT_SECRET: ${JWT_SECRET:-dev-shared-secret-change-me}
     ports:
       - "${GATEWAY_HOST_PORT:-3000}:3000"
@@ -132,6 +167,8 @@ services:
       driver-service:
         condition: service_healthy
       trip-service:
+        condition: service_healthy
+      location-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
