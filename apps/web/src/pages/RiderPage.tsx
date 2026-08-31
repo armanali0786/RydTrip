@@ -98,7 +98,10 @@ const RiderPageContent: React.FC = () => {
         <div className="w-full lg:w-[460px] shrink-0 p-4 lg:p-6 overflow-y-auto z-10 bg-canvas lg:shadow-card flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="font-display text-display-md text-ink">Rider Web</span>
+              <div>
+                <span className="font-display text-display-md text-ink">Rider Web</span>
+                {user && <div className="text-caption text-body">{user.name} • {user.phone}</div>}
+              </div>
               {step === 'ACTIVE_RIDE' && (
                 <button
                   onClick={() => setStep('SELECT_RIDE')}

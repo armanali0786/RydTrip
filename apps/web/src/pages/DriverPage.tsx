@@ -65,7 +65,11 @@ const DriverPageContent: React.FC = () => {
             <div className="flex items-center justify-between border-b border-canvas-soft pb-4">
               <div>
                 <span className="font-display text-display-md text-ink">Driver Dashboard</span>
-                <div className="text-caption text-body">{user?.name}</div>
+                <div className="text-caption text-body">
+                  {user?.name}
+                  {user?.vehicleType && <> • {user.vehicleType}</>}
+                </div>
+                <div className="text-caption text-mute">{user?.phone}</div>
               </div>
 
               <button

@@ -69,6 +69,8 @@ export interface User {
   phone: string;
   email: string;
   role: 'RIDER' | 'DRIVER';
+  // Only present for DRIVER — the vehicle body type Driver Service has on file.
+  vehicleType?: string;
   rating?: number;
   avatar?: string;
 }
