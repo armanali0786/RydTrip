@@ -29,55 +29,30 @@ export interface RegisterInput {
 
 interface AuthState {
   user: User | null;
-  role: Role;
   accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
 
-  setRole: (role: Role) => void;
   login: (role: Role, identifier: string, password: string) => Promise<void>;
   register: (role: Role, input: RegisterInput) => Promise<void>;
   logout: () => void;
   clearError: () => void;
 }
 
-const DEFAULT_RIDER: User = {
-  id: 'rider_arman_01',
-  name: 'Arman Ali',
-  email: 'arman@rydtrip.com',
-  phone: '+91 98765 43210',
-  role: 'RIDER',
-  rating: 4.95,
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-};
-
-const DEFAULT_DRIVER: User = {
-  id: 'driver_rahul_01',
-  name: 'Rahul Sharma',
-  email: 'rahul.driver@rydtrip.com',
-  phone: '+91 91234 56789',
-  role: 'DRIVER',
-  rating: 4.88,
-  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-};
+// No photo/rating in any backend response yet — these are placeholder
+// display-only fallbacks for a real logged-in user, not fake identities.
+const DEFAULT_RIDER_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80';
+const DEFAULT_DRIVER_AVATAR = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80';
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      user: DEFAULT_RIDER,
-      role: 'RIDER',
-      accessToken: 'mock_jwt_token',
-      isAuthenticated: true,
+      user: null,
+      accessToken: null,
+      isAuthenticated: false,
       isLoading: false,
       error: null,
-
-      setRole: (role) => {
-        set({
-          role,
-          user: role === 'RIDER' ? DEFAULT_RIDER : DEFAULT_DRIVER,
-        });
-      },
 
       login: async (role, identifier, password) => {
         set({ isLoading: true, error: null });
@@ -98,10 +73,11 @@ export const useAuthStore = create<AuthState>()(
               phone: profile.phone,
               email: profile.email,
               role,
-              rating: role === 'RIDER' ? 4.95 : 4.88,
-              avatar: role === 'RIDER' ? DEFAULT_RIDER.avatar : DEFAULT_DRIVER.avatar,
+              vehicleType: profile.vehicleType,
+              // No rating from any backend yet (see DriverInfo's own note on
+              // this) — a display-only placeholder avatar, not a fabricated stat.
+              avatar: role === 'RIDER' ? DEFAULT_RIDER_AVATAR : DEFAULT_DRIVER_AVATAR,
             },
-            role,
             accessToken: res.accessToken,
             isAuthenticated: true,
             isLoading: false,
@@ -130,8 +106,11 @@ export const useAuthStore = create<AuthState>()(
       clearError: () => set({ error: null }),
     }),
     {
-      name: 'rydtrip-auth-v2',
-      partialize: (state) => ({ user: state.user, role: state.role, accessToken: state.accessToken, isAuthenticated: state.isAuthenticated }),
+      // Bumped again: the fake-auto-login regression this fixes (DEFAULT_RIDER,
+      // isAuthenticated: true by default) crept back in a second time and
+      // persisted itself under v2 — bump invalidates any browser's stale copy.
+      name: 'rydtrip-auth-v3',
+      partialize: (state) => ({ user: state.user, accessToken: state.accessToken, isAuthenticated: state.isAuthenticated }),
     },
   ),
 );

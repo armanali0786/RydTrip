@@ -6,6 +6,11 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Wide open for local dev (apps/web, apps/rider-web, apps/driver-web all
+  // hit this gateway from their own vite ports) — tighten to an explicit
+  // origin allowlist before this goes anywhere near production (Phase 11).
+  app.enableCors({ origin: true, credentials: true });
+
   const config = new DocumentBuilder()
     .setTitle('API Gateway')
     .setDescription(

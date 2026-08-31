@@ -1,13 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Car, User as UserIcon, Shield, Globe, Menu, X, Smartphone, Layers, Zap } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { User as UserIcon, Menu, X, Zap, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { wsClient, ConnectionState } from '../../websocket/client';
 import { ConnectionBadge } from './Badge';
 
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join('');
+}
+
 export const Navbar: React.FC = () => {
-  const { user, role, setRole } = useAuthStore();
+  const { user, isAuthenticated, logout } = useAuthStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const [connectionState, setConnectionState] = useState<ConnectionState>('CONNECTED');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -67,51 +77,50 @@ export const Navbar: React.FC = () => {
           </nav>
         </div>
 
-        {/* Right Section: Live Badge + Role Switcher + User Info */}
+        {/* Right Section: Live Badge + Auth */}
         <div className="hidden sm:flex items-center gap-4">
           <ConnectionBadge state={connectionState} />
 
-          {/* Role Switcher */}
-          <div className="flex items-center rounded-xl bg-[#e8ebe6] p-1 border border-[#0e0f0c]/10">
-            <button
-              onClick={() => setRole('RIDER')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                role === 'RIDER'
-                  ? 'bg-white text-[#0e0f0c] shadow-sm'
-                  : 'text-[#454745] hover:text-[#0e0f0c]'
-              }`}
-            >
-              Rider
-            </button>
-            <button
-              onClick={() => setRole('DRIVER')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                role === 'DRIVER'
-                  ? 'bg-white text-[#0e0f0c] shadow-sm'
-                  : 'text-[#454745] hover:text-[#0e0f0c]'
-              }`}
-            >
-              Driver
-            </button>
-          </div>
-
-          {/* User Profile / Login Link */}
-          <Link
-            to="/login"
-            className="flex items-center gap-2.5 bg-[#e8ebe6] hover:bg-[#d8dcd5] border border-[#0e0f0c]/10 px-3.5 py-1.5 rounded-xl transition-colors"
-          >
-            <img
-              src={user?.avatar}
-              alt={user?.name}
-              className="h-7 w-7 rounded-full border border-[#0e0f0c] object-cover"
-            />
-            <div className="text-left">
-              <div className="text-xs font-bold text-[#0e0f0c] leading-tight">{user?.name}</div>
-              <div className="text-[10px] font-semibold text-[#054d28] leading-tight">
-                ⭐ {user?.rating} • {user?.role}
+          {isAuthenticated && user ? (
+            <div className="flex items-center gap-2.5 bg-[#e8ebe6] border border-[#0e0f0c]/10 px-3.5 py-1.5 rounded-xl">
+              {user.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name}
+                  className="h-7 w-7 rounded-full border border-[#0e0f0c] object-cover"
+                />
+              ) : (
+                <div className="h-7 w-7 rounded-full border border-[#0e0f0c] bg-white flex items-center justify-center text-[10px] font-black text-[#0e0f0c]">
+                  {initials(user.name)}
+                </div>
+              )}
+              <div className="text-left">
+                <div className="text-xs font-bold text-[#0e0f0c] leading-tight">{user.name}</div>
+                <div className="text-[10px] font-semibold text-[#454745] leading-tight uppercase tracking-wider">
+                  {user.role}
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate('/');
+                }}
+                title="Log out"
+                className="ml-1 p-1.5 text-[#454745] hover:text-[#0e0f0c] hover:bg-white rounded-lg transition-colors cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
-          </Link>
+          ) : (
+            <Link
+              to="/login"
+              className="flex items-center gap-2 bg-[#0e0f0c] hover:bg-[#0e0f0c]/85 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+            >
+              <UserIcon className="h-4 w-4" />
+              Log in
+            </Link>
+          )}
         </div>
 
         {/* Mobile Hamburger Toggle */}
