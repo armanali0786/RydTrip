@@ -1,9 +1,8 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/ui/Navbar';
 import { Footer } from '../components/ui/Footer';
 import { HeroRideForm } from '../components/booking/HeroRideForm';
-import { Button } from '../components/ui/Button';
 import {
   Car,
   Key,
@@ -16,39 +15,41 @@ import {
   Users,
   Award,
   ChevronRight,
+  Zap,
 } from 'lucide-react';
 
 export const MarketingHome: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-canvas text-ink flex flex-col font-text">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-text">
       <Navbar />
 
-      {/* 1. HERO BAND (WHITE SURFACE) */}
-      <section className="bg-canvas py-10 lg:py-16 border-b border-canvas-soft">
-        <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      {/* 1. HERO SECTION */}
+      <section className="bg-white py-10 lg:py-16 border-b border-slate-200/80">
+        <div className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             {/* Left Column: Hero Ride Form */}
-            <div className="lg:col-span-6 z-10">
+            <div className="lg:col-span-6 z-10 flex justify-center lg:justify-start">
               <HeroRideForm onSearchSubmit={() => navigate('/rider')} />
             </div>
 
-            {/* Right Column: Hero Editorial 4:3 Visual Frame */}
+            {/* Right Column: Hero Visual Showcase */}
             <div className="lg:col-span-6 relative">
-              <div className="relative overflow-hidden rounded-xl bg-canvas-soft shadow-card aspect-[4/3]">
+              <div className="relative overflow-hidden rounded-2xl bg-slate-900 shadow-card aspect-[4/3] group">
                 <img
                   src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800&auto=format&fit=crop&q=80"
-                  alt="RydTrip Rider Experience"
-                  className="h-full w-full object-cover"
+                  alt="RydTrip Experience"
+                  className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                <div className="absolute bottom-6 left-6 right-6 text-on-dark space-y-1">
-                  <span className="inline-block rounded-pill bg-canvas/20 px-3 py-1 text-caption font-semibold backdrop-blur-md">
-                    Urban Logistics Layer
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
+                <div className="absolute bottom-6 left-6 right-6 text-white space-y-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3.5 py-1 text-xs font-bold text-emerald-300 backdrop-blur-md">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    Live Dispatch GPS Engine
                   </span>
-                  <h3 className="font-display text-display-md text-on-dark">
-                    Seamless dispatch across 10,000+ cities
+                  <h3 className="font-display text-2xl font-bold text-white">
+                    Seamless ride dispatch across 10,000+ cities
                   </h3>
                 </div>
               </div>
@@ -58,8 +59,8 @@ export const MarketingHome: React.FC = () => {
       </section>
 
       {/* 2. CATEGORY CHIPS BAND */}
-      <section className="bg-canvas py-8 border-b border-canvas-soft">
-        <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
+      <section className="bg-white py-6 border-b border-slate-200/80">
+        <div className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-2">
             {[
               { label: 'Ride', icon: '🚗', active: true },
@@ -73,13 +74,13 @@ export const MarketingHome: React.FC = () => {
               <button
                 key={chip.label}
                 onClick={() => navigate('/rider')}
-                className={`flex shrink-0 items-center gap-2 rounded-pill px-5 py-3 text-body-sm-strong font-medium transition-all ${
+                className={`flex shrink-0 items-center gap-2.5 rounded-full px-5 py-2.5 text-sm font-bold transition-all cursor-pointer ${
                   chip.active
-                    ? 'bg-primary text-on-dark shadow-sm'
-                    : 'bg-canvas-soft text-ink hover:bg-surface-pressed'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200/80 hover:text-slate-900'
                 }`}
               >
-                <span>{chip.icon}</span>
+                <span className="text-base">{chip.icon}</span>
                 <span>{chip.label}</span>
               </button>
             ))}
@@ -87,42 +88,43 @@ export const MarketingHome: React.FC = () => {
         </div>
       </section>
 
-      {/* 3. POLARITY-FLIPPED BLACK PROMO BAND (MID-PAGE DEPTH SHIFT) */}
-      <section className="bg-primary text-on-dark py-16 lg:py-24">
-        <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            {/* Promo Left: Copy + White Secondary Pill CTA */}
+      {/* 3. PROMO BANNER (DARK SURFACE) */}
+      <section className="bg-slate-950 text-white py-16 lg:py-20 my-6">
+        <div className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            {/* Left Copy */}
             <div className="lg:col-span-6 space-y-6">
-              <span className="text-caption font-semibold uppercase tracking-wider text-canvas-soft">
-                WHY BECOME A DRIVER
+              <span className="inline-block rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                DRIVER PARTNER PROGRAM
               </span>
-              <h2 className="font-display text-display-xxl text-on-dark leading-tight">
+              <h2 className="font-display text-4xl lg:text-5xl font-extrabold text-white leading-tight">
                 Drive when you want, make what you need
               </h2>
-              <p className="text-body-lg text-canvas-soft/80 leading-relaxed">
-                Earn on your own schedule. Set your preferences, track earnings in real-time, and get cashouts on demand.
+              <p className="text-lg text-slate-300 leading-relaxed">
+                Earn on your own schedule. Set your preferences, track earnings in real time, and get instant cashouts.
               </p>
               <div className="flex flex-wrap gap-4 pt-2">
-                <Button variant="secondary" size="lg" onClick={() => navigate('/driver')}>
+                <button
+                  onClick={() => navigate('/driver')}
+                  className="px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-base shadow-lg shadow-emerald-500/20 transition-all cursor-pointer active:scale-[0.98]"
+                >
                   Get started as driver
-                </Button>
-                <Button
-                  variant="subtle"
-                  size="lg"
-                  className="bg-black-elevated text-on-dark hover:bg-canvas/10"
+                </button>
+                <button
                   onClick={() => navigate('/dual')}
+                  className="px-6 py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-base border border-slate-700 transition-all cursor-pointer active:scale-[0.98]"
                 >
                   Try Dual Dispatch Demo
-                </Button>
+                </button>
               </div>
             </div>
 
-            {/* Promo Right: 4:3 Editorial Image */}
+            {/* Right Visual */}
             <div className="lg:col-span-6">
-              <div className="overflow-hidden rounded-xl border border-black-elevated aspect-[4/3]">
+              <div className="overflow-hidden rounded-2xl border border-slate-800 aspect-[4/3] shadow-2xl">
                 <img
                   src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80"
-                  alt="Driver Experience"
+                  alt="Driver Partner"
                   className="h-full w-full object-cover"
                 />
               </div>
@@ -131,99 +133,74 @@ export const MarketingHome: React.FC = () => {
         </div>
       </section>
 
-      {/* 4. FEATURE CARDS GRID (WHITE SURFACE) */}
-      <section className="bg-canvas py-16 lg:py-24 border-b border-canvas-soft">
-        <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8 space-y-12">
+      {/* 4. FEATURE CARDS GRID */}
+      <section className="bg-white py-16 border-y border-slate-200/80">
+        <div className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8 space-y-10">
           <div className="max-w-2xl">
-            <span className="text-caption font-semibold uppercase tracking-wider text-body">
-              BUILT FOR URBAN MOBILITY
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600">
+              DISTRIBUTED MOBILITY ENGINE
             </span>
-            <h2 className="font-display text-display-xl text-ink mt-2">
-              Safety, simplicity, and scale
+            <h2 className="font-display text-3xl font-extrabold text-slate-900 mt-1">
+              Safety, speed, and real-time precision
             </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="rounded-xl bg-canvas p-6 shadow-subtle border border-canvas-soft space-y-4">
-              <div className="h-12 w-12 rounded-full bg-canvas-soft flex items-center justify-center text-primary font-bold text-xl">
+            <div className="rounded-2xl bg-slate-50 p-7 border border-slate-200/80 space-y-4 hover:border-slate-300 transition-all">
+              <div className="h-12 w-12 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-2xl">
                 🛡️
               </div>
-              <h3 className="font-display text-display-sm text-ink">Safety, simplified</h3>
-              <p className="text-body-md text-body">
-                24/7 incident response, GPS tracking on every trip, and emergency assistance right in the app.
+              <h3 className="font-display text-xl font-bold text-slate-900">Safety, simplified</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                24/7 incident response, live GPS route tracking on every ride, and emergency support embedded in-app.
               </p>
             </div>
 
-            <div className="rounded-xl bg-canvas p-6 shadow-subtle border border-canvas-soft space-y-4">
-              <div className="h-12 w-12 rounded-full bg-canvas-soft flex items-center justify-center text-primary font-bold text-xl">
+            <div className="rounded-2xl bg-slate-50 p-7 border border-slate-200/80 space-y-4 hover:border-slate-300 transition-all">
+              <div className="h-12 w-12 rounded-xl bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-2xl">
                 ⏰
               </div>
-              <h3 className="font-display text-display-sm text-ink">Plan for later with Reserve</h3>
-              <p className="text-body-md text-body">
-                Book your ride up to 90 days in advance so you can step into your day with peace of mind.
+              <h3 className="font-display text-xl font-bold text-slate-900">Reserve in advance</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Book your ride up to 90 days ahead so you can travel stress-free with locked-in driver availability.
               </p>
             </div>
 
-            <div className="rounded-xl bg-canvas p-6 shadow-subtle border border-canvas-soft space-y-4">
-              <div className="h-12 w-12 rounded-full bg-canvas-soft flex items-center justify-center text-primary font-bold text-xl">
+            <div className="rounded-2xl bg-slate-50 p-7 border border-slate-200/80 space-y-4 hover:border-slate-300 transition-all">
+              <div className="h-12 w-12 rounded-xl bg-cyan-100 flex items-center justify-center text-cyan-700 font-bold text-2xl">
                 ⚡
               </div>
-              <h3 className="font-display text-display-sm text-ink">Real-time matching engine</h3>
-              <p className="text-body-md text-body">
-                Powered by RydTrip distributed dispatch, Redis GEO indexing, and low-latency WebSockets.
+              <h3 className="font-display text-xl font-bold text-slate-900">Real-time matching</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Powered by RydTrip GEO indexing engine, WebSocket live streams, and instant driver matching algorithms.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 5. ANNUAL SHOWCASE CARD (GO•GET 2026) */}
-      <section className="bg-canvas py-16">
-        <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-xl bg-primary text-on-dark p-8 lg:p-14 shadow-card">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              <div className="lg:col-span-8 space-y-4">
-                <span className="inline-block rounded-pill bg-canvas/10 px-3 py-1 text-caption font-semibold tracking-widest text-canvas uppercase">
-                  GO•GET 2026 SHOWCASE
-                </span>
-                <h2 className="font-display text-display-xxl text-on-dark leading-tight">
-                  Next-generation dispatch & urban logistics
-                </h2>
-                <p className="text-body-lg text-canvas-soft/80 max-w-xl">
-                  Discover how RydTrip powers zero-emissions fleet dispatch, autonomous vehicle handoffs, and instant real-time driver tracking.
-                </p>
-                <div className="pt-2">
-                  <Button variant="secondary" size="lg" onClick={() => navigate('/dual')}>
-                    Launch Interactive Platform Demo <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="lg:col-span-4 flex justify-center">
-                <div className="h-48 w-48 rounded-full border-4 border-canvas-soft/20 flex items-center justify-center text-6xl animate-pulse">
-                  🚗⚡
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 6. APP DOWNLOAD PILLS BAND */}
-      <section className="bg-canvas-soft py-16 border-t border-canvas-soft">
-        <div className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8 text-center space-y-6">
-          <h2 className="font-display text-display-lg text-ink">
+      {/* 5. APP DOWNLOAD BUTTONS BAND */}
+      <section className="bg-slate-100 py-16 border-b border-slate-200">
+        <div className="mx-auto max-w-[1240px] px-4 sm:px-6 lg:px-8 text-center space-y-6">
+          <h2 className="font-display text-3xl font-extrabold text-slate-900">
             It's easier in the apps
           </h2>
           <div className="flex flex-wrap justify-center gap-4">
-            <Button variant="primary" size="lg" onClick={() => navigate('/rider')}>
-              <Smartphone className="h-5 w-5 mr-2" />
-              Download the Rider App
-            </Button>
-            <Button variant="primary" size="lg" onClick={() => navigate('/driver')}>
-              <Smartphone className="h-5 w-5 mr-2" />
-              Download the Driver App
-            </Button>
+            <button
+              onClick={() => navigate('/rider')}
+              className="px-6 py-3.5 rounded-xl bg-slate-900 hover:bg-emerald-600 text-white font-bold text-base shadow-md hover:shadow-emerald-500/20 flex items-center gap-2.5 transition-all cursor-pointer active:scale-[0.98]"
+            >
+              <Smartphone className="h-5 w-5" />
+              <span>Download Rider App</span>
+            </button>
+
+            <button
+              onClick={() => navigate('/driver')}
+              className="px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base shadow-md hover:shadow-emerald-500/20 flex items-center gap-2.5 transition-all cursor-pointer active:scale-[0.98]"
+            >
+              <Smartphone className="h-5 w-5" />
+              <span>Download Driver App</span>
+            </button>
           </div>
         </div>
       </section>

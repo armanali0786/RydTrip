@@ -1,22 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Car, User as UserIcon, Shield, Globe, Menu, X, Smartphone, Layers, LogOut } from 'lucide-react';
+import { Car, User as UserIcon, Shield, Globe, Menu, X, Smartphone, Layers, Zap } from 'lucide-react';
 import { useAuthStore } from '../../stores/useAuthStore';
 import { wsClient, ConnectionState } from '../../websocket/client';
 import { ConnectionBadge } from './Badge';
 
-function initials(name: string | undefined): string {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('');
-}
-
 export const Navbar: React.FC = () => {
-  const { user, logout } = useAuthStore();
+  const { user, role, setRole } = useAuthStore();
   const location = useLocation();
   const [connectionState, setConnectionState] = useState<ConnectionState>('CONNECTED');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -27,147 +17,143 @@ export const Navbar: React.FC = () => {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 bg-primary text-on-dark shadow-md">
-      <div className="mx-auto flex max-w-[1280px] items-center justify-between px-4 py-3.5 sm:px-8">
-        {/* Left Section: Brand + Navigation Links */}
+    <header className="sticky top-0 z-50 bg-slate-950 text-white shadow-lg border-b border-slate-800">
+      <div className="mx-auto flex max-w-[1240px] items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        {/* Left Section: Brand Logo + Nav Links */}
         <div className="flex items-center gap-8">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="font-display text-[26px] tracking-tight text-on-dark hover:opacity-90 transition-opacity">
+          <Link to="/" className="flex items-center gap-2 group">
+            <span className="font-display text-2xl font-black tracking-tight text-white group-hover:text-emerald-400 transition-colors">
               RydTrip
             </span>
-            <span className="rounded-pill bg-canvas-soft/20 px-2 py-0.5 text-[10px] font-semibold text-canvas uppercase tracking-wider">
-              Platform
+            <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+              Live
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6 text-body-md font-medium">
+          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold">
             <Link
               to="/rider"
-              className={`hover:text-canvas transition-colors ${
-                location.pathname === '/rider' ? 'text-on-dark font-semibold underline underline-offset-8' : 'text-canvas-soft/80'
+              className={`hover:text-emerald-400 transition-colors ${
+                location.pathname === '/rider' ? 'text-emerald-400 font-bold underline underline-offset-8' : 'text-slate-300'
               }`}
             >
               Ride
             </Link>
             <Link
               to="/driver"
-              className={`hover:text-canvas transition-colors ${
-                location.pathname === '/driver' ? 'text-on-dark font-semibold underline underline-offset-8' : 'text-canvas-soft/80'
+              className={`hover:text-emerald-400 transition-colors ${
+                location.pathname === '/driver' ? 'text-emerald-400 font-bold underline underline-offset-8' : 'text-slate-300'
               }`}
             >
               Drive
             </Link>
             <Link
               to="/dual"
-              className={`flex items-center gap-1.5 rounded-pill bg-canvas/10 px-3 py-1 text-body-sm font-medium hover:bg-canvas/20 transition-all ${
-                location.pathname === '/dual' ? 'bg-canvas text-primary font-semibold' : 'text-on-dark'
+              className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all ${
+                location.pathname === '/dual'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'bg-slate-800 text-emerald-400 hover:bg-slate-700'
               }`}
             >
-              <Layers className="h-3.5 w-3.5" />
+              <Zap className="h-3.5 w-3.5 fill-current" />
               <span>Dual Dispatch Mode</span>
             </Link>
             <Link
               to="/history"
-              className="text-canvas-soft/80 hover:text-canvas transition-colors"
+              className="text-slate-300 hover:text-white transition-colors"
             >
               Activity
             </Link>
           </nav>
         </div>
 
-        {/* Right Section: Status + Mode Pill + User Info */}
+        {/* Right Section: Live Badge + Switcher + User Info */}
         <div className="hidden sm:flex items-center gap-4">
           <ConnectionBadge state={connectionState} />
 
-          {user && (
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-canvas/20 bg-canvas-soft/20 text-caption font-bold text-on-dark">
-                  {initials(user.name)}
-                </div>
-                <div className="text-left">
-                  <div className="text-caption font-semibold text-on-dark leading-tight">{user.name}</div>
-                  <div className="text-[11px] text-canvas-soft/70 leading-tight capitalize">
-                    {user.role.toLowerCase()}
-                  </div>
-                </div>
+          {/* Role Switcher */}
+          <div className="flex items-center rounded-full bg-slate-900 p-1 border border-slate-800">
+            <button
+              onClick={() => setRole('RIDER')}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                role === 'RIDER'
+                  ? 'bg-white text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Rider
+            </button>
+            <button
+              onClick={() => setRole('DRIVER')}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                role === 'DRIVER'
+                  ? 'bg-white text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Driver
+            </button>
+          </div>
+
+          {/* User Profile */}
+          <div className="flex items-center gap-2.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-full">
+            <img
+              src={user?.avatar}
+              alt={user?.name}
+              className="h-7 w-7 rounded-full border border-emerald-400 object-cover"
+            />
+            <div className="text-left">
+              <div className="text-xs font-bold text-white leading-tight">{user?.name}</div>
+              <div className="text-[10px] font-semibold text-emerald-400 leading-tight">
+                ⭐ {user?.rating} • {user?.role}
               </div>
-              <button
-                onClick={logout}
-                aria-label="Log out"
-                className="flex items-center gap-1 rounded-pill bg-canvas-soft/10 px-2.5 py-1.5 text-caption font-medium text-canvas-soft hover:bg-canvas-soft/20 hover:text-canvas transition-colors"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                Log out
-              </button>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Mobile Hamburger Toggle */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="sm:hidden p-2 text-on-dark hover:bg-canvas/10 rounded-pill"
+          className="sm:hidden p-2 text-white hover:bg-slate-800 rounded-full"
           aria-label="Toggle menu"
         >
           {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="sm:hidden border-t border-canvas-soft/10 bg-primary px-6 py-6 space-y-4">
-          <div className="flex flex-col gap-3 font-medium">
+        <div className="sm:hidden border-t border-slate-800 bg-slate-950 px-6 py-6 space-y-4">
+          <div className="flex flex-col gap-3 font-semibold">
             <Link
               to="/"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-body-lg text-on-dark hover:text-canvas"
+              className="text-base text-white hover:text-emerald-400"
             >
-              Home Marketing
+              Home
             </Link>
             <Link
               to="/rider"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-body-lg text-on-dark hover:text-canvas"
+              className="text-base text-white hover:text-emerald-400"
             >
-              Rider Web
+              Rider Web App
             </Link>
             <Link
               to="/driver"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-body-lg text-on-dark hover:text-canvas"
+              className="text-base text-white hover:text-emerald-400"
             >
-              Driver Web
+              Driver Web App
             </Link>
             <Link
               to="/dual"
               onClick={() => setMobileMenuOpen(false)}
-              className="text-body-lg text-emerald-400 font-semibold"
+              className="text-base text-emerald-400 font-bold flex items-center gap-2"
             >
-              ⚡ Dual Dispatch Mode (Split View)
+              <Zap className="h-4 w-4" /> Dual Dispatch Split Mode
             </Link>
           </div>
-
-          {user && (
-            <div className="pt-4 border-t border-canvas-soft/10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-canvas-soft/20 text-body-sm font-bold text-on-dark">
-                  {initials(user.name)}
-                </div>
-                <div>
-                  <div className="text-body-md font-bold text-on-dark">{user.name}</div>
-                  <div className="text-caption text-canvas-soft/70 capitalize">{user.role.toLowerCase()}</div>
-                </div>
-              </div>
-              <button
-                onClick={logout}
-                className="flex items-center gap-1 rounded-pill bg-canvas-soft/10 px-3 py-1.5 text-caption font-medium text-canvas-soft hover:bg-canvas-soft/20 hover:text-canvas"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                Log out
-              </button>
-            </div>
-          )}
         </div>
       )}
     </header>

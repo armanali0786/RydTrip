@@ -1,9 +1,7 @@
 import React from 'react';
 import { VEHICLE_OPTIONS, calculateDistanceKm } from '../../api/rides';
 import { useBookingStore } from '../../stores/useBookingStore';
-import { VehicleType } from '../../types';
-import { Button } from '../../components/ui/Button';
-import { Users, Clock, ShieldCheck, CreditCard } from 'lucide-react';
+import { Users, Clock, ShieldCheck, CreditCard, ArrowRight } from 'lucide-react';
 
 interface RideOptionsListProps {
   onConfirmRide: () => void;
@@ -20,10 +18,10 @@ export const RideOptionsList: React.FC<RideOptionsListProps> = ({
   const distanceKm = pickup && destination ? calculateDistanceKm(pickup, destination) : 4.2;
 
   return (
-    <div className="flex flex-col h-full bg-canvas rounded-xl p-5 shadow-card border border-canvas-soft">
-      <h2 className="font-display text-display-md text-ink mb-2">Choose a ride</h2>
-      <p className="text-body-sm text-body mb-4">
-        Recommended options based on your location and group size
+    <div className="flex flex-col h-full bg-white rounded-2xl p-5 shadow-card border border-slate-100">
+      <h2 className="font-display text-2xl font-black text-slate-900 mb-1">Choose your ride</h2>
+      <p className="text-xs font-medium text-slate-500 mb-4">
+        Available vehicles near your pickup location
       </p>
 
       {/* Vehicle Options List */}
@@ -37,29 +35,29 @@ export const RideOptionsList: React.FC<RideOptionsListProps> = ({
               key={option.type}
               type="button"
               onClick={() => setSelectedVehicle(option.type)}
-              className={`w-full flex items-center justify-between p-3.5 rounded-xl border transition-all text-left ${
+              className={`w-full flex items-center justify-between p-3.5 rounded-xl border transition-all text-left cursor-pointer ${
                 isSelected
-                  ? 'border-primary bg-canvas-soft/70 shadow-sm ring-1 ring-primary'
-                  : 'border-canvas-soft bg-canvas hover:bg-canvas-softer'
+                  ? 'border-emerald-500 bg-emerald-50/50 shadow-md ring-2 ring-emerald-500/20'
+                  : 'border-slate-200/80 bg-white hover:bg-slate-50'
               }`}
             >
               <div className="flex items-center gap-3.5">
                 <img
                   src={option.image}
                   alt={option.name}
-                  className="h-12 w-16 object-cover rounded-md"
+                  className="h-12 w-16 object-cover rounded-lg shadow-sm"
                 />
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-display text-body-md-strong text-ink">{option.name}</span>
-                    <span className="flex items-center text-caption text-body bg-canvas-soft px-2 py-0.5 rounded-pill">
-                      <Users className="h-3 w-3 mr-1" />
+                    <span className="font-display text-base font-bold text-slate-900">{option.name}</span>
+                    <span className="flex items-center text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                      <Users className="h-3 w-3 mr-1 text-slate-500" />
                       {option.capacity}
                     </span>
                   </div>
-                  <div className="text-caption text-body flex items-center gap-1.5 mt-0.5">
-                    <Clock className="h-3 w-3 text-mute" />
-                    <span>~{option.eta} min away</span>
+                  <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                    <Clock className="h-3 w-3 text-emerald-600" />
+                    <span className="font-semibold text-emerald-600">~{option.eta} min away</span>
                     <span>•</span>
                     <span>{option.tagline}</span>
                   </div>
@@ -67,9 +65,9 @@ export const RideOptionsList: React.FC<RideOptionsListProps> = ({
               </div>
 
               <div className="text-right shrink-0">
-                <div className="font-display text-body-lg text-ink font-bold">₹{calculatedFare}</div>
+                <div className="font-display text-lg font-black text-slate-900">₹{calculatedFare}</div>
                 {isSelected && (
-                  <span className="text-[11px] font-semibold text-emerald-600">Selected</span>
+                  <span className="text-[11px] font-extrabold text-emerald-600 uppercase tracking-wider">Selected</span>
                 )}
               </div>
             </button>
@@ -78,35 +76,35 @@ export const RideOptionsList: React.FC<RideOptionsListProps> = ({
       </div>
 
       {/* Payment Method Selector */}
-      <div className="mt-4 pt-4 border-t border-canvas-soft flex items-center justify-between">
+      <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
         <button
           type="button"
           onClick={() =>
             setPaymentMethod(paymentMethod === 'MOCK_PAYMENT' ? 'CASH' : 'MOCK_PAYMENT')
           }
-          className="flex items-center gap-2 text-body-sm font-medium text-ink bg-canvas-soft px-3.5 py-2 rounded-pill hover:bg-surface-pressed transition-colors"
+          className="flex items-center gap-2 text-xs font-bold text-slate-800 bg-slate-100 px-3.5 py-2 rounded-full hover:bg-slate-200 transition-colors cursor-pointer"
         >
-          <CreditCard className="h-4 w-4 text-ink" />
-          <span>{paymentMethod === 'MOCK_PAYMENT' ? '💳 Mock Payment Card' : '💵 Cash'}</span>
+          <CreditCard className="h-4 w-4 text-slate-700" />
+          <span>{paymentMethod === 'MOCK_PAYMENT' ? '💳 RydTrip Card' : '💵 Cash'}</span>
         </button>
 
-        <span className="text-caption text-mute flex items-center gap-1">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+        <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+          <ShieldCheck className="h-4 w-4 text-emerald-600" />
           RydTrip Safety Included
         </span>
       </div>
 
-      {/* Confirm Ride Black Conversion Pill */}
-      <div className="mt-5 pt-2">
-        <Button
-          variant="primary"
-          size="lg"
-          fullWidth
+      {/* Confirm Ride Electric Emerald Button */}
+      <div className="mt-5 pt-1">
+        <button
+          type="button"
           onClick={onConfirmRide}
           disabled={isSubmitting}
+          className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-slate-900 hover:bg-emerald-600 text-white font-bold text-base shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 cursor-pointer active:scale-[0.98] disabled:opacity-50"
         >
-          {isSubmitting ? 'Requesting Ride...' : `Confirm ${selectedVehicle}`}
-        </Button>
+          <span>{isSubmitting ? 'Requesting Ride...' : `Confirm ${selectedVehicle}`}</span>
+          <ArrowRight className="h-5 w-5" />
+        </button>
       </div>
     </div>
   );

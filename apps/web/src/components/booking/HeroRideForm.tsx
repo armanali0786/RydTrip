@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Navigation, Calendar, Clock, ArrowRightLeft, Car, Key, ShieldCheck } from 'lucide-react';
-import { useBookingStore, DEFAULT_PICKUP, DEFAULT_DESTINATION } from '../../stores/useBookingStore';
-import { Button } from '../ui/Button';
+import { MapPin, Navigation, Calendar, Clock, ArrowRightLeft, Car, Key, ShieldCheck, ArrowRight } from 'lucide-react';
+import { useBookingStore } from '../../stores/useBookingStore';
 import { LocationPoint } from '../../types';
 
 const POPULAR_LOCATIONS: LocationPoint[] = [
-  { latitude: 17.4483, longitude: 78.3915, address: 'Hitec City Cyber Towers, Hyderabad', name: 'Cyber Towers' },
+  { latitude: 17.4483, longitude: 78.3915, address: 'Hitec City Metro Station, Hyderabad', name: 'Cyber Towers / Hitec City' },
   { latitude: 17.4399, longitude: 78.4983, address: 'Secunderabad Railway Station, Hyderabad', name: 'Secunderabad Station' },
   { latitude: 17.2403, longitude: 78.4294, address: 'Rajiv Gandhi International Airport (HYD)', name: 'Airport (HYD)' },
   { latitude: 17.43, longitude: 78.44, address: 'Jubilee Hills Road No. 36, Hyderabad', name: 'Jubilee Hills' },
@@ -24,8 +23,8 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
     swapPickupDestination,
   } = useBookingStore();
 
-  const [pickupInput, setPickupInput] = useState(pickup?.address || '');
-  const [destinationInput, setDestinationInput] = useState(destination?.address || '');
+  const [pickupInput, setPickupInput] = useState(pickup?.address || 'Hitec City Metro Station, Hyderabad');
+  const [destinationInput, setDestinationInput] = useState(destination?.address || 'Secunderabad Railway Station, Hyderabad');
   const [showPickupDropdown, setShowPickupDropdown] = useState(false);
   const [showDestDropdown, setShowDestDropdown] = useState(false);
   const [scheduledForLater, setScheduledForLater] = useState(false);
@@ -54,16 +53,16 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
   };
 
   return (
-    <div className="w-full max-w-[490px] rounded-xl bg-canvas p-6 shadow-card border border-canvas-soft">
-      {/* Off-shape Tab-toggle translucent pill (36px rounded) */}
-      <div className="mb-6 flex items-center justify-between gap-1 rounded-pill-tab bg-canvas-soft p-1">
+    <div className="w-full max-w-[480px] rounded-2xl bg-white p-6 md:p-8 shadow-card border border-slate-100 text-slate-900">
+      {/* Mode Tabs */}
+      <div className="mb-6 flex items-center justify-between gap-1.5 rounded-2xl bg-slate-100 p-1.5 border border-slate-200/60">
         <button
           type="button"
           onClick={() => setActiveTab('ride')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-pill-tab text-body-md-strong transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === 'ride'
-              ? 'bg-primary text-on-dark shadow-sm'
-              : 'text-ink hover:bg-canvas/50'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
           }`}
         >
           <Car className="h-4 w-4" />
@@ -73,10 +72,10 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
         <button
           type="button"
           onClick={() => setActiveTab('drive')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-pill-tab text-body-md-strong transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === 'drive'
-              ? 'bg-primary text-on-dark shadow-sm'
-              : 'text-ink hover:bg-canvas/50'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
           }`}
         >
           <Key className="h-4 w-4" />
@@ -86,10 +85,10 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
         <button
           type="button"
           onClick={() => setActiveTab('reserve')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-pill-tab text-body-md-strong transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === 'reserve'
-              ? 'bg-primary text-on-dark shadow-sm'
-              : 'text-ink hover:bg-canvas/50'
+              ? 'bg-slate-900 text-white shadow-md'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
           }`}
         >
           <Clock className="h-4 w-4" />
@@ -97,28 +96,28 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
         </button>
       </div>
 
-      <h1 className="font-display text-display-xl font-bold text-ink mb-6 leading-tight">
-        Go anywhere with RydTrip
+      <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 mb-6 leading-snug">
+        Go anywhere with <span className="text-emerald-600">RydTrip</span>
       </h1>
 
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Pickup Input Row */}
         <div className="relative">
-          <div className="flex items-center rounded-md bg-canvas-soft px-3.5 py-3 border border-transparent focus-within:border-ink transition-colors">
-            <span className="mr-3 text-ink">📍</span>
+          <div className="flex items-center rounded-xl bg-slate-100 px-4 py-3 border border-transparent focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+            <span className="mr-3 text-emerald-600 text-lg">📍</span>
             <input
               type="text"
               value={pickupInput}
               onChange={(e) => setPickupInput(e.target.value)}
               onFocus={() => setShowPickupDropdown(true)}
-              placeholder="Pickup location"
-              className="w-full bg-transparent text-body-md font-medium text-ink placeholder:text-mute focus:outline-none"
+              placeholder="Enter pickup location"
+              className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
             />
             {pickupInput && (
               <button
                 type="button"
                 onClick={() => setPickupInput('')}
-                className="text-caption text-mute hover:text-ink"
+                className="text-slate-400 hover:text-slate-700 text-xs font-bold px-1.5 py-0.5 rounded"
               >
                 ✕
               </button>
@@ -127,21 +126,21 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
 
           {/* Autocomplete Dropdown */}
           {showPickupDropdown && (
-            <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-xl bg-canvas p-2 shadow-card border border-canvas-soft">
-              <div className="text-caption font-semibold text-mute px-3 py-1 uppercase tracking-wider">
-                Popular Pickups
+            <div className="absolute left-0 right-0 top-full z-30 mt-1.5 rounded-xl bg-white p-2 shadow-2xl border border-slate-100">
+              <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider">
+                Popular Pickup Points
               </div>
               {POPULAR_LOCATIONS.map((loc) => (
                 <button
                   key={loc.name}
                   type="button"
                   onClick={() => handleSelectPickup(loc)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-md hover:bg-canvas-soft text-body-sm text-ink font-medium"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-800 transition-colors"
                 >
-                  <MapPin className="h-4 w-4 text-body shrink-0" />
+                  <MapPin className="h-4 w-4 text-emerald-600 shrink-0" />
                   <div>
-                    <div>{loc.name}</div>
-                    <div className="text-caption text-mute">{loc.address}</div>
+                    <div className="font-semibold">{loc.name}</div>
+                    <div className="text-xs text-slate-500">{loc.address}</div>
                   </div>
                 </button>
               ))}
@@ -149,31 +148,31 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
           )}
         </div>
 
-        {/* Destination Input Row */}
+        {/* Dropoff Input Row */}
         <div className="relative">
-          <div className="flex items-center rounded-md bg-canvas-soft px-3.5 py-3 border border-transparent focus-within:border-ink transition-colors">
-            <span className="mr-3 text-ink">🏁</span>
+          <div className="flex items-center rounded-xl bg-slate-100 px-4 py-3 border border-transparent focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+            <span className="mr-3 text-slate-700 text-lg">🏁</span>
             <input
               type="text"
               value={destinationInput}
               onChange={(e) => setDestinationInput(e.target.value)}
               onFocus={() => setShowDestDropdown(true)}
-              placeholder="Dropoff location"
-              className="w-full bg-transparent text-body-md font-medium text-ink placeholder:text-mute focus:outline-none"
+              placeholder="Enter dropoff destination"
+              className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
             />
             <button
               type="button"
               onClick={swapPickupDestination}
-              className="ml-2 p-1 text-body hover:text-ink rounded-full"
-              title="Swap pickup and dropoff"
+              className="ml-2 p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded-full transition-colors"
+              title="Swap pickup & dropoff"
             >
               <ArrowRightLeft className="h-4 w-4" />
             </button>
           </div>
 
           {showDestDropdown && (
-            <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-xl bg-canvas p-2 shadow-card border border-canvas-soft">
-              <div className="text-caption font-semibold text-mute px-3 py-1 uppercase tracking-wider">
+            <div className="absolute left-0 right-0 top-full z-30 mt-1.5 rounded-xl bg-white p-2 shadow-2xl border border-slate-100">
+              <div className="text-[11px] font-bold text-slate-400 px-3 py-1.5 uppercase tracking-wider">
                 Popular Destinations
               </div>
               {POPULAR_LOCATIONS.map((loc) => (
@@ -181,12 +180,12 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
                   key={loc.name}
                   type="button"
                   onClick={() => handleSelectDest(loc)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-md hover:bg-canvas-soft text-body-sm text-ink font-medium"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-slate-50 text-sm font-medium text-slate-800 transition-colors"
                 >
-                  <Navigation className="h-4 w-4 text-body shrink-0" />
+                  <Navigation className="h-4 w-4 text-slate-700 shrink-0" />
                   <div>
-                    <div>{loc.name}</div>
-                    <div className="text-caption text-mute">{loc.address}</div>
+                    <div className="font-semibold">{loc.name}</div>
+                    <div className="text-xs text-slate-500">{loc.address}</div>
                   </div>
                 </button>
               ))}
@@ -194,35 +193,39 @@ export const HeroRideForm: React.FC<{ onSearchSubmit?: () => void }> = ({ onSear
           )}
         </div>
 
-        {/* Date / Time Chip Row */}
-        <div className="flex items-center gap-2 pt-1">
+        {/* Schedule & Timing Chips */}
+        <div className="flex items-center gap-2.5 pt-1">
           <button
             type="button"
             onClick={() => setScheduledForLater(!scheduledForLater)}
-            className={`flex items-center gap-2 rounded-pill px-4 py-2 text-body-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all ${
               scheduledForLater
-                ? 'bg-primary text-on-dark'
-                : 'bg-canvas-soft text-ink hover:bg-surface-pressed'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200/70'
             }`}
           >
-            <Calendar className="h-4 w-4" />
-            <span>{scheduledForLater ? 'Pickup: Today 5:30 PM' : 'Pickup now'}</span>
+            <Calendar className="h-3.5 w-3.5" />
+            <span>{scheduledForLater ? 'Today 5:30 PM' : 'Pickup now'}</span>
           </button>
-          
+
           <button
             type="button"
-            className="flex items-center gap-2 rounded-pill bg-canvas-soft px-4 py-2 text-body-sm font-medium text-ink hover:bg-surface-pressed transition-colors"
+            className="flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200/70 transition-colors"
           >
-            <Clock className="h-4 w-4" />
+            <Clock className="h-3.5 w-3.5" />
             <span>For me</span>
           </button>
         </div>
 
-        {/* Black Canonical Conversion Primary Pill */}
+        {/* Primary CTA Button - High Visibility Electric Button */}
         <div className="pt-3">
-          <Button variant="primary" size="lg" fullWidth type="submit">
-            See prices & request
-          </Button>
+          <button
+            type="submit"
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-slate-900 hover:bg-emerald-600 text-white font-bold text-base shadow-lg hover:shadow-emerald-500/25 transition-all duration-200 cursor-pointer active:scale-[0.98]"
+          >
+            <span>See prices & request ride</span>
+            <ArrowRight className="h-5 w-5" />
+          </button>
         </div>
       </form>
     </div>
