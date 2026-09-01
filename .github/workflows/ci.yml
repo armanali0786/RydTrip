@@ -51,6 +51,12 @@ jobs:
       # services' postinstall runs `prisma generate`, which unit tests in
       # those workspaces transitively need even without a real database.
       - run: npm ci
+      # libraries/*/dist is gitignored (build output) — services import the
+      # compiled JS via each library's package.json "main", so it has to be
+      # built here; the local dev environment just happens to already have
+      # it built from prior work.
+      - name: Build shared libraries
+        run: npm run build --workspace=libraries/event-schema --workspace=libraries/observability --workspace=libraries/redis-client --workspace=libraries/circuit-breaker --if-present
       - name: Run unit tests (*.spec.ts)
         working-directory: ${{ matrix.workspace }}
         run: npx jest --testPathPattern='\.spec\.ts$'
@@ -80,6 +86,8 @@ jobs:
           node-version-file: ${{ env.NODE_VERSION_FILE }}
           cache: npm
       - run: npm ci
+      - name: Build shared libraries
+        run: npm run build --workspace=libraries/event-schema --workspace=libraries/observability --workspace=libraries/redis-client --workspace=libraries/circuit-breaker --if-present
       - name: Run integration tests (*.e2e-spec.ts)
         working-directory: services/${{ matrix.service }}
         run: npx jest --testPathPattern='\.e2e-spec\.ts$'
