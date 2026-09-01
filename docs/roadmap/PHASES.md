@@ -431,12 +431,51 @@ Exit criteria:
 
 ## Phase 12 — CI/CD
 
+**Note:** rate limiting was pulled forward alongside this phase (user-requested
+DDoS mitigation) — see the RBAC/RateLimitGuard bullet below. It's an
+API Gateway feature, not a CI/CD one, but shipped in the same pass.
+
 Deliverables:
-- GitHub Actions: lint, unit test, integration test (Testcontainers), Docker build, image scan
-- Branch protection requiring the pipeline to pass
+- **Rate limiting at the API Gateway**
+  (`services/api-gateway/src/rate-limit/rate-limit.guard.ts`) — an in-memory,
+  per-IP, fixed-window limiter registered as an `APP_GUARD` ahead of
+  `JwtAuthGuard` (see `app.module.ts`'s import order), so a flood is rejected
+  on a cheap counter check before a JWT ever gets verified. Tiered by route,
+  the same declarative-policy style as `jwt-auth.guard.ts`'s `ROLE_POLICIES`:
+  registration/login and the two unauthenticated guest-estimate reads
+  (`GET /drivers/nearby`, `GET /drivers/:id/vehicle`) get the tightest limits
+  (10/min, 20/min) since they're the pre-auth surface an anonymous attacker
+  hits first; everything else gets a looser default (100/min). In-memory is
+  correct today because the gateway is single-replica (Phase 9's HPA only
+  covers dispatch-service/location-service) — a Redis-backed store would be
+  needed only if the gateway itself is ever scaled out. `/health/*` is exempt,
+  same as `JwtAuthGuard`. Verified live against the real docker-compose
+  gateway: 10 requests to `POST /riders/login` succeed (400, bad credentials)
+  then the 11th+ return `429` with a `Retry-After` header, while an unrelated
+  route on the same IP is unaffected (proves the tiers don't share a bucket)
+  and `/health/live` stays `200` throughout. Also rolled out to the live kind
+  cluster.
+- GitHub Actions (`.github/workflows/ci.yml`): `lint` (root `npm run lint`),
+  `unit-test` (matrix over all 6 services + `libraries/circuit-breaker`,
+  `*.spec.ts` only), `integration-test` (matrix over all 6 services,
+  `*.e2e-spec.ts` only — Testcontainers spins its own Postgres/Kafka/Redis
+  per test file, so no extra service containers are needed in the workflow
+  itself; GitHub-hosted `ubuntu-latest` runners have Docker preinstalled),
+  `build-and-scan` (matrix: `docker build` each of the 6 service images, then
+  Trivy at the same `HIGH,CRITICAL`/`--ignore-unfixed` threshold as
+  `scripts/scan-images.sh`, Phase 11), and a final `ci-success` job that
+  `needs` all of the above — the single required status check branch
+  protection points at, so it doesn't need updating every time a matrix
+  changes shape.
+- Branch protection on `main` requiring `ci-success` to pass before merge
+  (`gh api repos/armanali0786/RideMesh/branches/main/protection`).
+- Lint stays the existing root `npm run lint` stub (`echo "Linting passes"`)
+  — CI wires up what the repo already calls "lint" rather than introducing a
+  new ESLint setup across 14 workspaces, which wasn't in scope for this pass.
 
 Exit criteria:
-- [ ] A PR with a failing test is blocked from merge by the pipeline, demonstrated once, not just configured
+- [ ] A PR with a failing test is blocked from merge by the pipeline,
+  demonstrated once, not just configured
 
 ---
 
