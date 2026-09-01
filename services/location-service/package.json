@@ -16,6 +16,7 @@
     "@nestjs/platform-express": "^10.4.15",
     "@nestjs/swagger": "^8.1.1",
     "@rydtrip/event-schema": "*",
+    "@rydtrip/observability": "*",
     "@rydtrip/redis-client": "*",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",

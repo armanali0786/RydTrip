@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { CancellationReason, createKafkaClient, EventConsumer, GeoPoint, KAFKA_TOPICS } from '@rydtrip/event-schema';
+import { tagCorrelationId } from '@rydtrip/observability';
 import { TripsService } from './trips.service';
 
 interface RideRequestedPayload {
@@ -83,6 +84,7 @@ export class RideEventsConsumer implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `consumed ${envelope.eventType} eventId=${envelope.eventId} correlationId=${envelope.correlationId}`,
       );
+      tagCorrelationId(envelope.correlationId);
 
       if (envelope.eventType === KAFKA_TOPICS.RIDE_REQUESTED) {
         if (!isRideRequestedPayload(envelope.payload)) {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { tagCorrelationId } from '@rydtrip/observability';
 import { NearbyQueryDto } from './dto/nearby-query.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
 import { LocationsService } from './locations.service';
@@ -17,7 +18,9 @@ export class LocationsController {
     @Body() dto: UpdateLocationDto,
     @Headers('x-correlation-id') correlationId?: string,
   ) {
-    await this.locationsService.updateLocation(driverId, dto.lat, dto.lng, correlationId ?? randomUUID());
+    const cid = correlationId ?? randomUUID();
+    tagCorrelationId(cid);
+    await this.locationsService.updateLocation(driverId, dto.lat, dto.lng, cid);
     return { driverId, status: 'ACCEPTED' };
   }
 

@@ -129,6 +129,30 @@ state machine) wrap Dispatch Service's calls to Redis and to Driver Service's be
 status sync, so a struggling dependency gets failed-fast against instead of every
 `ride.requested` event hanging on its own connection retry/timeout.
 
+## Observability model (Phase 10)
+
+`libraries/observability` gives every service two things for free, with no per-service
+wiring beyond one import each:
+
+- **`GET /metrics`** (`MetricsModule`) — Node process metrics (`prom-client`'s
+  `collectDefaultMetrics()`) plus `http_requests_total`/`http_request_duration_seconds`
+  labeled by method/route/status, recorded by a global middleware. Scraped by the
+  docker-compose `prometheus` service; `kafka-exporter` and `redis-exporter` separately
+  expose the broker/store-side metrics (consumer lag, topic throughput, memory,
+  connected clients) that no Node client library can observe from inside a service
+  process. Grafana (provisioned automatically, no manual dashboard setup) reads all of it
+  — see `infrastructure/observability/`.
+- **Distributed tracing** (`initTracing(serviceName)`, called as the very first line of
+  every `main.ts`) — OpenTelemetry's Node auto-instrumentation patches `http`, `fetch`
+  (via `undici`), `kafkajs`, and `ioredis` by hooking `require`, so a single logical
+  operation produces one linked trace across process and transport boundaries: API
+  Gateway's outgoing `fetch` to Rider Service, Rider Service's Kafka publish, Dispatch's
+  and Trip's Kafka consumes, and Dispatch's Redis calls all land as spans in the *same*
+  trace, exported via OTLP/HTTP to Jaeger — no manual span-stitching required. Every
+  place a service already threads the app's own `x-correlation-id` also calls
+  `tagCorrelationId()`, so a trace can be found in Jaeger by the same id already used for
+  cross-service log correlation.
+
 ## Related documents
 
 - [state-machines.md](state-machines.md) — full ride and driver state machines

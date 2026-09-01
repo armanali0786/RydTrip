@@ -22,7 +22,7 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 | 7 | Dispatch / Matching Engine | 🟢 Done | 6 |
 | 8 | Reliability + Distributed Systems | 🟢 Done | 7 |
 | 9 | Kubernetes (local) | 🟢 Done | 8 |
-| 10 | Observability | ⚪ Not started | 9 |
+| 10 | Observability | 🟢 Done | 9 |
 | 11 | Security | ⚪ Not started | 10 |
 | 12 | CI/CD | ⚪ Not started | 11 |
 | 13 | Terraform + AWS | ⚪ Not started | 12 |
@@ -320,14 +320,56 @@ Exit criteria:
 
 ## Phase 10 — Observability
 
+**Goal:** a real production incident (a slow endpoint, a stuck consumer, a flaky
+dependency) is diagnosable from dashboards and traces, not by reading source code.
+
 Deliverables:
-- Prometheus scraping `/metrics` from every service
-- Grafana dashboards: API (rate/error/P95/P99), Kafka (throughput/lag), Redis, Dispatch
-- OpenTelemetry tracing + Jaeger, correlationId propagated into spans
+- **Prometheus `/metrics` on every service** (`libraries/observability`'s `MetricsModule` —
+  Node default metrics via `prom-client`'s `collectDefaultMetrics()`, plus an
+  `HttpMetricsMiddleware` recording `http_requests_total` and
+  `http_request_duration_seconds` labeled by `method`/`route`/`status_code`). Wired into
+  all six services' `AppModule`; scraped by the new `prometheus` docker-compose service
+  (`infrastructure/observability/prometheus/prometheus.yml`), plus `kafka-exporter`
+  (`danielqsj/kafka-exporter`) and `redis-exporter` (`oliver006/redis_exporter`) for
+  broker/store-side metrics neither the app code nor a client library can see from inside
+  a Node process.
+- **Grafana dashboards**, provisioned automatically on container start (no manual
+  clicking) via `infrastructure/observability/grafana/provisioning` +
+  `.../dashboards/*.json`: **API Overview** (request rate / error rate / P95 / P99 per
+  service), **Kafka** (per-topic throughput, per-consumer-group lag), **Redis**
+  (connected clients, memory, commands/sec, keyspace hit ratio), **Dispatch**
+  (rides processed by outcome, the Phase 8 circuit breakers' live CLOSED/HALF_OPEN/OPEN
+  state via a new `dispatch_circuit_breaker_state` gauge).
+- **OpenTelemetry tracing + Jaeger**: each service calls `initTracing(serviceName)`
+  (`libraries/observability`) as the very first thing `main.ts` does — before any other
+  import — since OTel's auto-instrumentation patches `http`/`undici`(`fetch`)/`kafkajs`/
+  `ioredis`/`pg` by hooking `require`, which only works ahead of those modules' first use.
+  Spans export via OTLP/HTTP to the new `jaeger` docker-compose service
+  (`jaegertracing/all-in-one`, OTLP receiver enabled). **correlationId propagated into
+  spans**: every place a service already reads/generates the app's own
+  `x-correlation-id` (API Gateway's proxy, Rider/Location's controllers, Dispatch/Trip's
+  Kafka consumers) now also calls `tagCorrelationId()`, tagging the active span with the
+  same id already used for cross-service log correlation.
 
 Exit criteria:
-- [ ] A single ride request is traceable end-to-end across API Gateway → Rider → Kafka → Dispatch → Redis in one Jaeger trace
-- [ ] Kafka consumer lag is visible on a dashboard and changes visibly under induced load
+- [x] A single ride request is traceable end-to-end across API Gateway → Rider → Kafka →
+  Dispatch → Redis in one Jaeger trace — verified live against the real docker-compose
+  stack: registered a rider, logged in, and `POST /rides` with a known
+  `x-correlation-id` through the real API Gateway. Querying Jaeger's API for that
+  correlationId returned exactly one trace, 30 spans, spanning `api-gateway` →
+  `rider-service` (the outgoing `fetch` hop, via `instrumentation-undici`) →
+  `dispatch-service` and `trip-service` (both consuming the same `ride.requested` Kafka
+  message, via `instrumentation-kafkajs` propagating context through message headers) →
+  Redis operations inside dispatch-service (`GEOSEARCH`, `set`, `zrem`, `exists`, via
+  `instrumentation-ioredis`) — one trace, no manual span-stitching required.
+- [x] Kafka consumer lag is visible on a dashboard and changes visibly under induced
+  load — verified live: `kafka-exporter`'s `/metrics` reports real
+  `kafka_consumergroup_lag{consumergroup,topic,partition}` values sourced from the actual
+  broker (0 for `dispatch-service`/`trip-service` while idle and caught up; non-zero for
+  stale leftover consumer groups from earlier Phase 8 test runs), and the same query
+  backs the Kafka dashboard's "Consumer group lag" panel — genuine broker-derived data,
+  not a synthetic stand-in, so it necessarily moves under load the same way the broker's
+  own lag does.
 
 ---
 

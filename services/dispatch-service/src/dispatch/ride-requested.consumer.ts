@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { createKafkaClient, EventConsumer, GeoPoint, KAFKA_TOPICS } from '@rydtrip/event-schema';
+import { tagCorrelationId } from '@rydtrip/observability';
 import { DispatchService } from './dispatch.service';
 import { RedisService } from '../redis/redis.service';
 
@@ -61,6 +62,7 @@ export class RideRequestedConsumer implements OnModuleInit, OnModuleDestroy {
 
     await this.consumer.run(async (envelope) => {
       this.logger.log(`consumed ${envelope.eventType} eventId=${envelope.eventId} correlationId=${envelope.correlationId}`);
+      tagCorrelationId(envelope.correlationId);
 
       if (!isRideRequestedPayload(envelope.payload)) {
         throw new Error(`malformed ${KAFKA_TOPICS.RIDE_REQUESTED} payload for eventId=${envelope.eventId}`);

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, HttpCode, HttpStatus, Param, Post, Headers } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { tagCorrelationId } from '@rydtrip/observability';
 import { CancelRideDto } from './dto/cancel-ride.dto';
 import { CreateRideDto } from './dto/create-ride.dto';
 import { RidesService } from './rides.service';
@@ -13,7 +14,9 @@ export class RidesController {
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
   async create(@Body() dto: CreateRideDto, @Headers('x-correlation-id') correlationId?: string) {
-    return this.ridesService.create(dto, correlationId ?? randomUUID());
+    const cid = correlationId ?? randomUUID();
+    tagCorrelationId(cid);
+    return this.ridesService.create(dto, cid);
   }
 
   @Post(':id/cancel')
@@ -23,6 +26,8 @@ export class RidesController {
     @Body() dto: CancelRideDto,
     @Headers('x-correlation-id') correlationId?: string,
   ) {
-    return this.ridesService.cancel(id, correlationId ?? randomUUID(), dto.reason);
+    const cid = correlationId ?? randomUUID();
+    tagCorrelationId(cid);
+    return this.ridesService.cancel(id, cid, dto.reason);
   }
 }
