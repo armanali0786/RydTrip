@@ -80,7 +80,36 @@ generous speed threshold; not implemented, since Phase 6/7's scope was correctne
 the GEO index itself, not anti-spoofing. Worth doing before this ever carries real
 driver-earnings implications.
 
-## 4. Resource ownership gaps RBAC does not close (called out for completeness)
+## 4. Volumetric abuse (credential stuffing, scraping, request floods)
+
+**Threat**: an attacker with no valid token hammers the pre-auth surface
+(`POST /riders`, `POST /riders/login`, `POST /drivers`, `POST /drivers/login`,
+and the two guest-estimate reads `GET /drivers/nearby` / `GET /drivers/:id/vehicle`)
+— credential stuffing against login, account-enumeration via registration's
+conflict response, scraping driver locations, or simply a volumetric flood
+aimed at exhausting gateway/downstream capacity.
+
+**Mitigation** (Phase 12): `RateLimitGuard`
+(`services/api-gateway/src/rate-limit/rate-limit.guard.ts`), an `APP_GUARD`
+registered ahead of `JwtAuthGuard`, so a flood is rejected on a cheap
+in-memory per-IP counter check before a JWT is ever verified. The pre-auth
+surface above gets the tightest limits (10-20 requests/min); everything else
+gets a looser default (100/min). Verified live: 10 requests to
+`POST /riders/login` succeed, the 11th+ return `429` with `Retry-After`.
+
+**Residual risk**: this defends the application layer, not the network layer
+— a distributed flood (many source IPs, or one behind a spoofed/rotating
+`X-Forwarded-For` if `trust proxy` is ever misconfigured beyond the single
+hop it's set for) isn't stopped by a per-IP counter alone. Real DDoS
+mitigation at scale is an infrastructure concern (AWS Shield / CloudFront in
+front of the ALB, Phase 13+), not something an application-level guard can
+fully substitute for. Also unmitigated: the counters are in-memory and
+per-process, so they reset on a gateway restart and don't survive/aggregate
+across replicas — acceptable today since the gateway is single-instance
+(Phase 9's HPA doesn't cover it), but would need a Redis-backed store the
+moment it does.
+
+## 5. Resource ownership gaps RBAC does not close (called out for completeness)
 
 RBAC (this phase) checks *role* everywhere, and *identity-vs-path-param* ownership
 specifically for `/riders/:id`, `/drivers/:id`, `PATCH /drivers/:id/status`, and
