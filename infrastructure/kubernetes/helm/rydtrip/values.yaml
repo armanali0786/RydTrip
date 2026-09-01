@@ -43,6 +43,11 @@ services:
     port: 3001
     hostAliases: [postgres, kafka]
     useJwtSecret: true
+    # Not read-only: `prisma migrate deploy` (run at container start) fails
+    # to resolve its schema-engine binary under a read-only root filesystem
+    # on this image — verified live, same as the docker-compose services.
+    readOnlyRootFilesystem: false
+    ingressFrom: [api-gateway]
     env:
       DATABASE_URL: postgresql://rydtrip:rydtrip@postgres:5432/rydtrip_riders
       KAFKA_BROKERS: kafka:9092
@@ -52,6 +57,11 @@ services:
     port: 3002
     hostAliases: [postgres]
     useJwtSecret: true
+    readOnlyRootFilesystem: false # same Prisma schema-engine issue as rider-service
+    # dispatch-service calls PATCH /drivers/:id/status directly (best-effort
+    # status sync after winning a reservation), bypassing the gateway — see
+    # dispatch.service.ts's syncDriverStatusBestEffort.
+    ingressFrom: [api-gateway, dispatch-service]
     env:
       DATABASE_URL: postgresql://rydtrip:rydtrip@postgres:5432/rydtrip_drivers
       JWT_EXPIRES_IN: 1d
@@ -59,6 +69,8 @@ services:
   trip-service:
     port: 3003
     hostAliases: [postgres, kafka]
+    readOnlyRootFilesystem: false # same Prisma schema-engine issue as rider-service
+    ingressFrom: [api-gateway]
     env:
       DATABASE_URL: postgresql://rydtrip:rydtrip@postgres:5432/rydtrip_trips
       KAFKA_BROKERS: kafka:9092
@@ -66,6 +78,8 @@ services:
   location-service:
     port: 3004
     hostAliases: [redis, kafka]
+    readOnlyRootFilesystem: true
+    ingressFrom: [api-gateway]
     env:
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:9092
@@ -79,6 +93,10 @@ services:
   dispatch-service:
     port: 3005
     hostAliases: [redis, kafka]
+    readOnlyRootFilesystem: true
+    # Pure Kafka consumer with no REST API of its own (see dispatch.service.ts)
+    # — nothing calls it over HTTP, so it gets no ingress allowance at all.
+    ingressFrom: []
     env:
       REDIS_URL: redis://redis:6379
       KAFKA_BROKERS: kafka:9092
@@ -98,6 +116,9 @@ services:
     port: 3000
     hostAliases: []
     useJwtSecret: true
+    readOnlyRootFilesystem: true
+    # The one public entrypoint — reachable from outside the cluster too.
+    ingressFrom: ["*"]
     env:
       RIDER_SERVICE_URL: http://rider-service:3001
       DRIVER_SERVICE_URL: http://driver-service:3002

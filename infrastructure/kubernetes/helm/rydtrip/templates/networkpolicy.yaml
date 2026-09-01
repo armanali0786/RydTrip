@@ -1,0 +1,61 @@
+# Phase 11: restricts cross-service traffic to what's actually needed, on the
+# ingress side (egress is left open — the pods' only egress targets are the
+# docker-compose-bridged postgres/kafka/redis by IP, per composeNetwork in
+# values.yaml, and those IPs can change across a compose recreation; pinning
+# egress to them here would make that existing fragility worse, not better).
+#
+# IMPORTANT CAVEAT: kind's default CNI (kindnet) does not enforce
+# NetworkPolicy at all — see infrastructure/kubernetes/README.md. These
+# policies are correct and ready to enforce the moment the cluster runs a
+# NetworkPolicy-capable CNI (Calico, Cilium, or any managed one — including
+# EKS's, which is what Phase 13 targets), but today they are not actually
+# restricting anything on this local kind cluster. Verify with `kubectl
+# describe networkpolicy -n rydtrip`, not by testing whether a denied call
+# actually fails here.
+#
+# Also note: these policies don't special-case kubelet's own liveness/
+# readiness probe traffic (which originates from the node, not a pod, so it
+# can't be expressed as a podSelector rule). Most real NetworkPolicy-enforcing
+# CNIs (Calico, EKS's) exempt host-local kubelet probes from NetworkPolicy
+# enforcement by design; verify this isn't the exception on whichever CNI
+# actually enforces these before relying on it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  labels:
+    {{- include "rydtrip.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+
+{{- range $name, $svc := .Values.services }}
+{{- if $svc.ingressFrom }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-allow-ingress
+  labels:
+    {{- include "rydtrip.labels" $ | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ $name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- if has "*" $svc.ingressFrom }}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+        {{- else }}
+        {{- range $svc.ingressFrom }}
+        - podSelector:
+            matchLabels:
+              app: {{ . }}
+        {{- end }}
+        {{- end }}
+      ports:
+        - port: {{ $svc.port }}
+{{- end }}
+{{- end }}

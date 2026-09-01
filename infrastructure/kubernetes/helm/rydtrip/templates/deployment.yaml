@@ -20,10 +20,29 @@ spec:
         app: {{ $name }}
     spec:
       {{- include "rydtrip.hostAliases" (list $ $svc.hostAliases) | nindent 6 }}
+      securityContext:
+        runAsNonRoot: true
+        # Every Dockerfile creates its `rydtrip` user identically (`adduser
+        # -S`), which Alpine deterministically assigns uid 100 — verified
+        # across all six images. Kubernetes' runAsNonRoot check needs a
+        # numeric uid to verify against (it can't resolve a username from
+        # the image without running it), which the Dockerfiles' `USER
+        # rydtrip` (by name) doesn't give it on its own.
+        runAsUser: 100
       containers:
         - name: {{ $name }}
           image: "rydtrip-{{ $name }}:{{ $.Values.image.tag }}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: {{ $svc.readOnlyRootFilesystem | default false }}
+            capabilities:
+              drop: ["ALL"]
+          {{- if $svc.readOnlyRootFilesystem }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          {{- end }}
           ports:
             - containerPort: {{ $svc.port }}
           env:
@@ -54,4 +73,9 @@ spec:
               port: {{ $svc.port }}
             initialDelaySeconds: 5
             periodSeconds: 5
+      {{- if $svc.readOnlyRootFilesystem }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- end }}
 {{- end }}
