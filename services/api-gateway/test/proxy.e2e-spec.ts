@@ -11,6 +11,7 @@ describe('API Gateway (e2e)', () => {
   let app: INestApplication;
   let fakeUpstream: http.Server;
   let riderToken: string;
+  let driverToken: string;
 
   beforeAll(async () => {
     fakeUpstream = http.createServer((req, res) => {
@@ -36,11 +37,12 @@ describe('API Gateway (e2e)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    riderToken = await new JwtService({ secret: process.env.JWT_SECRET ?? DEFAULT_JWT_SECRET }).signAsync({
-      sub: 'rider-1',
-      role: 'rider',
-      phone: '+919876543210',
-    });
+    const jwt = new JwtService({ secret: process.env.JWT_SECRET ?? DEFAULT_JWT_SECRET });
+    riderToken = await jwt.signAsync({ sub: 'rider-1', role: 'rider', phone: '+919876543210' });
+    // sub matches the 'some-id' path param the tests below hit — RBAC's
+    // ownership check (Phase 11) requires GET /drivers/:id's :id to equal the
+    // token's own sub, since any driver role alone isn't the *right* driver.
+    driverToken = await jwt.signAsync({ sub: 'some-id', role: 'driver', phone: '+919876500000' });
   });
 
   afterAll(async () => {
@@ -77,7 +79,25 @@ describe('API Gateway (e2e)', () => {
   it('returns 502 when the upstream service is unreachable, given a valid token', async () => {
     await request(app.getHttpServer())
       .get('/drivers/some-id')
-      .set('Authorization', `Bearer ${riderToken}`)
+      .set('Authorization', `Bearer ${driverToken}`)
       .expect(502);
+  });
+
+  it('rejects a role not permitted for the route with 403', async () => {
+    // GET /drivers/:id is driver/operator-only (RBAC, Phase 11) — a rider
+    // token is valid but not the right role.
+    await request(app.getHttpServer())
+      .get('/drivers/some-id')
+      .set('Authorization', `Bearer ${riderToken}`)
+      .expect(403);
+  });
+
+  it('rejects one driver acting on another driver\'s resource with 403', async () => {
+    // driverToken's sub is 'some-id' — a different :id is the right role but
+    // the wrong resource, which RBAC's ownership check (Phase 11) catches.
+    await request(app.getHttpServer())
+      .get('/drivers/a-different-driver-id')
+      .set('Authorization', `Bearer ${driverToken}`)
+      .expect(403);
   });
 });

@@ -1,11 +1,19 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { getProxyRoutes, matchRoute } from '../proxy/routes';
 
+// 'operator' has no account-creation flow anywhere yet (no operator
+// registration/login exists in any service) — it's included in every policy
+// below so RBAC is already forward-compatible with Phase 13+'s eventual
+// admin/ops tooling, without another pass through every route once that
+// exists. Today, every real token minted by rider-service/driver-service's
+// login endpoints only ever carries 'rider' or 'driver'.
+export type Role = 'rider' | 'driver' | 'operator';
+
 export interface AuthenticatedUser {
   sub: string;
-  role: 'rider' | 'driver';
+  role: Role;
   phone: string;
 }
 
@@ -38,6 +46,49 @@ function isPublicRoute(method: string, path: string): boolean {
   return PUBLIC_PATTERNS.some((route) => route.method === method && route.pattern.test(path));
 }
 
+interface RolePolicy {
+  method: string;
+  pattern: RegExp;
+  roles: Role[];
+  /**
+   * Regex capture group index holding the resource's own id (e.g. the
+   * :driverId in /drivers/:id/status). When set, the token's `sub` must equal
+   * that captured value — otherwise any driver could spoof another driver's
+   * location or status, which role-only RBAC alone wouldn't catch (both are
+   * "a driver", just not the *right* driver). 'operator' bypasses this, same
+   * as it bypasses nothing else — it's meant to manage others' resources.
+   * Not set for /trips/:id/* — the trip's owning rider/driver isn't known to
+   * the gateway (would need a domain DB lookup it deliberately doesn't have,
+   * see proxy.controller.ts); that gap is called out in threat-model.md.
+   */
+  ownIdGroup?: number;
+}
+
+// RBAC ("is this role allowed to call this route", as distinct from ADR-005's
+// "is this token valid at all") — a route not listed here has no role
+// restriction and is reachable by any authenticated role, same as before this
+// existed.
+const ROLE_POLICIES: readonly RolePolicy[] = [
+  { method: 'GET', pattern: /^\/riders\/([^/]+)$/, roles: ['rider', 'operator'], ownIdGroup: 1 },
+  { method: 'POST', pattern: /^\/rides$/, roles: ['rider', 'operator'] },
+  { method: 'POST', pattern: /^\/rides\/[^/]+\/cancel$/, roles: ['rider', 'operator'] },
+  { method: 'GET', pattern: /^\/drivers\/([^/]+)$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
+  { method: 'PATCH', pattern: /^\/drivers\/([^/]+)\/status$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
+  { method: 'POST', pattern: /^\/drivers\/([^/]+)\/location$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
+  { method: 'GET', pattern: /^\/trips\/[^/]+$/, roles: ['rider', 'driver', 'operator'] },
+  { method: 'POST', pattern: /^\/trips\/[^/]+\/(driver-arrived|start|complete)$/, roles: ['driver', 'operator'] },
+  { method: 'POST', pattern: /^\/trips\/[^/]+\/cancel$/, roles: ['rider', 'driver', 'operator'] },
+];
+
+function findPolicy(method: string, path: string): { policy: RolePolicy; match: RegExpMatchArray } | undefined {
+  for (const policy of ROLE_POLICIES) {
+    if (policy.method !== method) continue;
+    const match = path.match(policy.pattern);
+    if (match) return { policy, match };
+  }
+  return undefined;
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
@@ -67,9 +118,21 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       req.user = await this.jwtService.verifyAsync<AuthenticatedUser>(token);
-      return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+
+    const found = findPolicy(req.method, req.path);
+    if (found) {
+      const { policy, match } = found;
+      if (!policy.roles.includes(req.user.role)) {
+        throw new ForbiddenException(`Role '${req.user.role}' is not permitted to call this route`);
+      }
+      if (policy.ownIdGroup !== undefined && req.user.role !== 'operator' && match[policy.ownIdGroup] !== req.user.sub) {
+        throw new ForbiddenException(`Cannot act on another ${req.user.role}'s resource`);
+      }
+    }
+
+    return true;
   }
 }

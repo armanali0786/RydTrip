@@ -130,6 +130,13 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
     ports:
       - "${RIDER_HOST_PORT:-3001}:3001"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Not read_only: Prisma's schema-engine binary resolution (used by
+    # `prisma migrate deploy` at startup) breaks under a read-only root fs on
+    # this image — verified live; see infrastructure docs for the exact
+    # failure. Needs an image-build fix (vendoring the engine differently)
+    # before this can be tightened further.
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,6 +160,9 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
     ports:
       - "${DRIVER_HOST_PORT:-3002}:3002"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Not read_only — same Prisma schema-engine issue as rider-service above.
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,6 +183,9 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
     ports:
       - "${TRIP_HOST_PORT:-3003}:3003"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    # Not read_only — same Prisma schema-engine issue as rider-service above.
     depends_on:
       postgres:
         condition: service_healthy
@@ -196,6 +209,10 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
     ports:
       - "${LOCATION_HOST_PORT:-3004}:3004"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: [/tmp]
     depends_on:
       redis:
         condition: service_healthy
@@ -224,6 +241,10 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
     ports:
       - "${DISPATCH_HOST_PORT:-3005}:3005"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: [/tmp]
     depends_on:
       redis:
         condition: service_healthy
@@ -249,6 +270,10 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
     ports:
       - "${GATEWAY_HOST_PORT:-3000}:3000"
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs: [/tmp]
     depends_on:
       rider-service:
         condition: service_healthy

@@ -18,7 +18,9 @@
     "build": "npm run build --workspace=@rydtrip/web",
     "lint": "echo \"Linting passes\"",
     "test": "echo \"Testing passes\"",
-    "replay-dlq": "ts-node --transpile-only scripts/replay-dlq.ts"
+    "replay-dlq": "ts-node --transpile-only scripts/replay-dlq.ts",
+    "security:audit": "npm audit --audit-level=high",
+    "security:scan-images": "bash scripts/scan-images.sh"
   },
   "license": "MIT"
 }

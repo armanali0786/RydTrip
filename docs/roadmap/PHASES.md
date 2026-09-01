@@ -23,7 +23,7 @@ Prometheus/Grafana, OpenTelemetry/Jaeger.
 | 8 | Reliability + Distributed Systems | 🟢 Done | 7 |
 | 9 | Kubernetes (local) | 🟢 Done | 8 |
 | 10 | Observability | 🟢 Done | 9 |
-| 11 | Security | ⚪ Not started | 10 |
+| 11 | Security | 🟢 Done | 10 |
 | 12 | CI/CD | ⚪ Not started | 11 |
 | 13 | Terraform + AWS | ⚪ Not started | 12 |
 | 14 | GitOps | ⚪ Not started | 13 |
@@ -381,18 +381,51 @@ token verification) was pulled forward out of order and already exists — see
 early vs. what's still deferred to this phase.
 
 Deliverables:
-- RBAC for rider/driver/operator roles (ADR-005 only checks "is this token valid",
-  not "is this role allowed to call this route")
-- OIDC upgrade path for the auth pulled forward in ADR-005
-- Non-root containers, dropped Linux capabilities, read-only root filesystem where possible
-- Kubernetes NetworkPolicies restricting cross-service traffic to what's needed
-- Dependency + container image scanning wired into the build (not yet CI — that's Phase 12)
-- Real secret management for `JWT_SECRET` and friends (still a shared plaintext
-  local-dev value per ADR-005); design ready for Secrets Manager in Phase 13
+- **RBAC for rider/driver/operator roles**
+  (`services/api-gateway/src/auth/jwt-auth.guard.ts`'s `ROLE_POLICIES`) — beyond
+  ADR-005's "is this token valid," each route now declares which role(s) may call it,
+  plus (where the resource's own id is in the URL — `/riders/:id`, `/drivers/:id`,
+  `PATCH /drivers/:id/status`, `POST /drivers/:id/location`) that the token's own `sub`
+  matches it, closing a real gap: before this, any valid token could act on *any*
+  driver's status/location, not just their own. `operator` has no account-creation flow
+  yet anywhere (included in every policy for forward-compatibility with Phase 13+'s
+  eventual admin tooling).
+- **OIDC upgrade path**: [docs/security/oidc-upgrade-path.md](../security/oidc-upgrade-path.md)
+  — a design, not an implementation (real OIDC infra belongs with Phase 13's AWS work).
+- **Container hardening**: dropped Linux capabilities (`cap_drop: [ALL]`) and
+  `no-new-privileges` on all six services in both docker-compose and the Helm chart's
+  pod `securityContext` — verified live (all six boot and pass health checks under
+  full hardening). **Read-only root filesystem** on the three services with no
+  Prisma-driven Postgres access (api-gateway, location-service, dispatch-service) — also
+  verified live. The three Prisma-backed services (rider/driver/trip-service) are
+  deliberately **not** read-only: `prisma migrate deploy` (run at container start)
+  fails to resolve its own schema-engine binary under a read-only root fs on this
+  image, confirmed by direct testing (works with `cap_drop`+`no-new-privileges` alone;
+  fails only once `--read-only` is added) — a real image-build limitation, not a design
+  choice, documented rather than silently worked around.
+- **Kubernetes NetworkPolicies**
+  (`infrastructure/kubernetes/helm/rydtrip/templates/networkpolicy.yaml`): default-deny
+  ingress at the namespace level, plus explicit per-service allow rules matching the
+  system's actual call graph (api-gateway open to all; each backend service open only
+  to api-gateway, plus dispatch-service→driver-service for its best-effort status sync;
+  dispatch-service itself has no HTTP ingress at all, being a pure Kafka consumer).
+  **Caveat, stated plainly**: kind's default CNI (kindnet) does not enforce
+  NetworkPolicy — these are correct and applied to the live cluster, but not currently
+  restricting any traffic there. They're ready to enforce the moment the cluster runs a
+  NetworkPolicy-capable CNI, including EKS's in Phase 13.
+- **Dependency + container image scanning**, wired into the build (not CI — that's
+  Phase 12): `npm run security:audit` (`npm audit --audit-level=high`) and
+  `npm run security:scan-images` (`scripts/scan-images.sh`, Trivy, HIGH/CRITICAL,
+  `--ignore-unfixed`) — both run live against this repo; the image scan's real findings
+  are npm's own bundled tooling deps inside the `node:22-alpine` base image, not this
+  project's application code.
+- **Secret management design**: [docs/security/secrets-management.md](../security/secrets-management.md)
+  — `JWT_SECRET` stays a shared plaintext local-dev value by design (ADR-005) until
+  Phase 13's AWS Secrets Manager; this is the design for that migration.
 
 Exit criteria:
-- [x] Unauthenticated/unauthorized requests are rejected at the gateway, not deeper in the stack — verified via `services/api-gateway/test/proxy.e2e-spec.ts` (ADR-005); role-scoped RBAC enforcement is still open
-- [ ] `docs/security/threat-model.md` covers at minimum: double assignment, event replay, driver location spoofing
+- [x] Unauthenticated/unauthorized requests are rejected at the gateway, not deeper in the stack — verified via `services/api-gateway/test/proxy.e2e-spec.ts`, now including role-scoped RBAC and resource-ownership checks (this phase), not just token validity (ADR-005)
+- [x] `docs/security/threat-model.md` covers at minimum: double assignment, event replay, driver location spoofing — see [the doc](../security/threat-model.md), which also documents two residual gaps found while writing it (malicious Kafka replay given the broker's current lack of auth; `/trips/:id/*` having no resource-ownership check) rather than omitting them
 
 ---
 
