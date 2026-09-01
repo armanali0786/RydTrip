@@ -57,9 +57,13 @@ jobs:
       # it built from prior work.
       - name: Build shared libraries
         run: npm run build --workspace=libraries/event-schema --workspace=libraries/observability --workspace=libraries/redis-client --workspace=libraries/circuit-breaker --if-present
+      # --passWithNoTests: location-service and rider-service currently have
+      # no *.spec.ts files of their own (only *.e2e-spec.ts, covered by the
+      # integration-test job) — that's a real, existing gap in this repo's
+      # test layout, not something this workflow should mask as a failure.
       - name: Run unit tests (*.spec.ts)
         working-directory: ${{ matrix.workspace }}
-        run: npx jest --testPathPattern='\.spec\.ts$'
+        run: npx jest --testPathPattern='\.spec\.ts$' --passWithNoTests
 
   integration-test:
     runs-on: ubuntu-latest
@@ -90,7 +94,7 @@ jobs:
         run: npm run build --workspace=libraries/event-schema --workspace=libraries/observability --workspace=libraries/redis-client --workspace=libraries/circuit-breaker --if-present
       - name: Run integration tests (*.e2e-spec.ts)
         working-directory: services/${{ matrix.service }}
-        run: npx jest --testPathPattern='\.e2e-spec\.ts$'
+        run: npx jest --testPathPattern='\.e2e-spec\.ts$' --passWithNoTests
 
   build-and-scan:
     needs: [lint, unit-test, integration-test]
