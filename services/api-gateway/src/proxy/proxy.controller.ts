@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { All, Controller, Req, Res } from '@nestjs/common';
 import type { Response } from 'express';
+import { tagCorrelationId } from '@rydtrip/observability';
 import type { RequestWithUser } from '../auth/jwt-auth.guard';
 import { getProxyRoutes, matchRoute } from './routes';
 
@@ -24,6 +25,7 @@ export class ProxyController {
     }
 
     const correlationId = (req.headers['x-correlation-id'] as string | undefined) ?? randomUUID();
+    tagCorrelationId(correlationId);
     const upstreamUrl = `${route.target}${req.originalUrl}`;
     const hasBody = !['GET', 'HEAD'].includes(req.method);
 

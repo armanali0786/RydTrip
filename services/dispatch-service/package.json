@@ -17,7 +17,9 @@
     "@nestjs/swagger": "^8.1.1",
     "@rydtrip/circuit-breaker": "*",
     "@rydtrip/event-schema": "*",
+    "@rydtrip/observability": "*",
     "@rydtrip/redis-client": "*",
+    "prom-client": "^15.1.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1"

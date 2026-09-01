@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CircuitBreaker } from '@rydtrip/circuit-breaker';
 import { CancellationReason, DriverStatus, GeoPoint, KAFKA_TOPICS } from '@rydtrip/event-schema';
+import { getRidesProcessedCounter, registerCircuitStateGauge } from './dispatch-metrics';
 import { KafkaPublisherService } from '../kafka/kafka-publisher.service';
 import { RedisService } from '../redis/redis.service';
 
@@ -58,10 +59,15 @@ export class DispatchService {
     resetTimeoutMs: Number(process.env.DISPATCH_CIRCUIT_RESET_TIMEOUT_MS) || DEFAULTS.circuitResetTimeoutMs,
   });
 
+  private readonly ridesProcessed = getRidesProcessedCounter();
+
   constructor(
     private readonly redis: RedisService,
     private readonly kafkaPublisher: KafkaPublisherService,
-  ) {}
+  ) {
+    registerCircuitStateGauge('dispatch-redis', () => this.redisBreaker.getState());
+    registerCircuitStateGauge('dispatch-driver-service-sync', () => this.driverServiceBreaker.getState());
+  }
 
   async handleRideRequested(rideId: string, pickup: GeoPoint, correlationId: string): Promise<void> {
     const candidates = await this.redisBreaker.execute(() =>
@@ -95,6 +101,7 @@ export class DispatchService {
         { correlationId, key: rideId },
       );
       this.logger.log(`ride ${rideId} matched with driver ${candidate.driverId}`);
+      this.ridesProcessed.inc({ outcome: 'matched' });
       return;
     }
 
@@ -105,6 +112,7 @@ export class DispatchService {
       { correlationId, key: rideId },
     );
     this.logger.log(`ride ${rideId} rejected — no reservable driver among ${candidates.length} candidate(s)`);
+    this.ridesProcessed.inc({ outcome: 'no_driver_available' });
   }
 
   private async syncDriverStatusBestEffort(driverId: string): Promise<void> {
