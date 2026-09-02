@@ -83,7 +83,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2">
             <span className="font-display text-4xl font-black text-[#0e0f0c] tracking-tight">RydTrip</span>
-            <span className="rounded-full bg-[#e2f6d5] border border-[#c5edab] px-2.5 py-0.5 text-xs font-bold text-[#054d28]">Wise Spec</span>
           </div>
           <p className="text-sm font-semibold text-[#454745] text-center">
             {mode === 'LOGIN' ? 'Log in to continue your journey' : 'Create an account to get started'}

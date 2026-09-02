@@ -9,9 +9,6 @@ export const Footer: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="font-display text-3xl font-black tracking-tight text-white">RydTrip</span>
-              <span className="rounded-full bg-[#163300] border border-[#9fe870]/30 px-2.5 py-0.5 text-[10px] font-extrabold text-[#9fe870] uppercase tracking-wider">
-                Wise Fintech UI
-              </span>
             </div>
             <p className="text-sm text-[#e8ebe6]/80 max-w-md leading-relaxed font-medium">
               RydTrip distributed logistics engine powering urban mobility, instant ride-hailing, and real-time driver dispatch at scale.
