@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Car, Loader2, ArrowRight, CheckCircle2, Circle } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
@@ -13,6 +14,7 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
   const { login, register, isLoading, error, clearError } = useAuthStore();
   const { showToast } = useToastStore();
+  const navigate = useNavigate();
 
   const [role, setRole] = useState<'RIDER' | 'DRIVER'>(requiredRole ?? 'RIDER');
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
@@ -32,6 +34,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
   const requiredDocuments = getRequiredDocuments(city);
   const permitRequired = requiredDocuments.find((d) => d.key === 'permitNumber')?.required ?? false;
 
+  const resetForm = () => {
+    setName('');
+    setIdentifier('');
+    setEmail('');
+    setPhone('');
+    setPassword('');
+    setVehicleType(DRIVER_VEHICLE_TYPES[0]);
+    setCity('');
+    setLicenseNumber('');
+    setVehicleRegistrationNumber('');
+    setInsurancePolicyNumber('');
+    setPermitNumber('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
@@ -39,7 +55,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
       if (mode === 'LOGIN') {
         await login(role, identifier, password);
         showToast(`Welcome back, ${useAuthStore.getState().user?.name ?? 'there'}!`, 'success');
+        if (!requiredRole) navigate('/');
       } else {
+        const registeredName = name;
         await register(role, {
           name,
           email,
@@ -49,7 +67,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
             ? { vehicleType, city, licenseNumber, vehicleRegistrationNumber, insurancePolicyNumber, permitNumber: permitNumber || undefined }
             : {}),
         });
-        showToast(`Account created — welcome, ${useAuthStore.getState().user?.name ?? name}!`, 'success');
+        showToast(`Account created — welcome, ${useAuthStore.getState().user?.name ?? registeredName}!`, 'success');
+        resetForm();
       }
     } catch (err) {
       // Inline banner below still shows the store's `error` — the toast is
