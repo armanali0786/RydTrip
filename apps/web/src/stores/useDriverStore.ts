@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { DriverStatus, LocationPoint, Ride, RideRequestPayload } from '../types';
 import { useAuthStore } from './useAuthStore';
 import { wsClient } from '../websocket/client';
+import { updateDriverLocation } from '../api/drivers';
 
 interface DriverStoreState {
   status: DriverStatus;
@@ -55,6 +56,12 @@ export const useDriverStore = create<DriverStoreState>((set, get) => ({
       wsClient.send('driver.location.updated', {
         driverId: driver.id,
         location: loc,
+      });
+      // Real heartbeat to Location Service's Redis GEO index — without this,
+      // going "online" never made a driver findable by GET /drivers/nearby.
+      updateDriverLocation(driver.id, loc.latitude, loc.longitude).catch(() => {
+        // Best-effort: a dropped ping just skips this tick's GEO refresh,
+        // and the next one (a few seconds later) will retry.
       });
     }
   },

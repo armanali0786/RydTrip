@@ -38,20 +38,59 @@ const DriverPageContent: React.FC = () => {
     };
   }, [status, activeTrip, setIncomingRequest]);
 
-  // Simulate smooth GPS location movement when driving
+  // Real device GPS drives the driver's position when available and permitted;
+  // otherwise falls back to a simulated jitter walk (most desktop dev setups).
+  // Either way, setCurrentLocation is what pings Location Service, and a
+  // heartbeat re-sends the last known fix well inside its 30s TTL — watchPosition
+  // alone won't refire if the device simply isn't moving.
   useEffect(() => {
     if (status !== 'ONLINE' && !activeTrip) return;
 
-    const interval = setInterval(() => {
-      setCurrentLocation({
-        ...currentLocation,
-        latitude: currentLocation.latitude + (Math.random() - 0.5) * 0.001,
-        longitude: currentLocation.longitude + (Math.random() - 0.5) * 0.001,
-      });
-    }, 4000);
+    let watchId: number | null = null;
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
 
-    return () => clearInterval(interval);
-  }, [status, activeTrip, currentLocation, setCurrentLocation]);
+    const jitterTick = () => {
+      const loc = useDriverStore.getState().currentLocation;
+      setCurrentLocation({
+        ...loc,
+        latitude: loc.latitude + (Math.random() - 0.5) * 0.001,
+        longitude: loc.longitude + (Math.random() - 0.5) * 0.001,
+      });
+    };
+
+    const startFallback = () => {
+      if (fallbackInterval) return;
+      fallbackInterval = setInterval(jitterTick, 4000);
+    };
+
+    if ('geolocation' in navigator) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setCurrentLocation({
+            ...useDriverStore.getState().currentLocation,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        },
+        startFallback,
+        { enableHighAccuracy: true, maximumAge: 15000 }
+      );
+    } else {
+      startFallback();
+    }
+
+    // Register immediately on go-online instead of waiting for the first tick.
+    setCurrentLocation(useDriverStore.getState().currentLocation);
+    const heartbeat = setInterval(() => {
+      setCurrentLocation(useDriverStore.getState().currentLocation);
+    }, 15000);
+
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (fallbackInterval) clearInterval(fallbackInterval);
+      clearInterval(heartbeat);
+    };
+  }, [status, activeTrip, setCurrentLocation]);
 
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col font-text">
