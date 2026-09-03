@@ -179,7 +179,7 @@ const DriverPageContent: React.FC = () => {
         </div>
 
         {/* Right Map View */}
-        <div className="flex-1 h-full min-h-[400px]">
+        <div className="flex-1 min-h-[400px]">
           <RideMap
             driverLocation={currentLocation}
             pickup={activeTrip?.pickup}

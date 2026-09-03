@@ -275,7 +275,7 @@ export const RiderPage: React.FC = () => {
         </div>
 
         {/* Right Side Full Map */}
-        <div className="flex-1 h-full min-h-[400px]">
+        <div className="flex-1 min-h-[400px]">
           <RideMap
             pickup={pickup}
             destination={destination}
