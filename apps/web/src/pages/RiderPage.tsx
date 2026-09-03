@@ -14,9 +14,22 @@ import { useRideStore } from '../stores/useRideStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import { createRide, cancelRide } from '../api/rides';
+import { getTrip } from '../api/trips';
+import { getDriverContact } from '../api/drivers';
 import { wsClient } from '../websocket/client';
 import { ArrowLeft, X } from 'lucide-react';
 import { LoginPage } from './LoginPage';
+import { RideStatus } from '../types';
+
+// How often the rider's screen polls for the real backend ride state —
+// there's no real-time push transport yet (dispatch-service, and the
+// driver's own arrive/start/complete actions, all happen against the real
+// backend independently of this tab), so this is how a rider actually
+// learns their ride was matched/arrived/started/completed. The
+// ride.status.changed WS events above still fire too (same-browser demo),
+// this just makes it work across separate rider/driver sessions for real.
+const RIDE_POLL_MS = 4000;
+const TERMINAL_STATUSES: RideStatus[] = ['COMPLETED', 'CANCELLED'];
 
 /**
  * Browsing (locations, map, price comparison) needs no login — only actually
@@ -65,6 +78,60 @@ export const RiderPage: React.FC = () => {
       unsubDriverLoc();
     };
   }, [activeRide, updateRideStatus, assignDriver, updateDriverLocation]);
+
+  // Poll the real backend for this ride's true state — the actual fix for
+  // "the rider's screen never advances past Finding your driver" when the
+  // driver is a different browser/session (see RIDE_POLL_MS's own note).
+  useEffect(() => {
+    if (!activeRide || TERMINAL_STATUSES.includes(activeRide.status)) return;
+
+    const rideId = activeRide.id;
+    let stopped = false;
+
+    const poll = async () => {
+      let trip;
+      try {
+        trip = await getTrip(rideId);
+      } catch {
+        return; // Best-effort — try again next tick.
+      }
+      if (stopped) return;
+
+      const current = useRideStore.getState().activeRide;
+      if (!current || current.id !== rideId) return;
+
+      // Backend's ride status values are a strict subset of the frontend's
+      // RideStatus union (it never returns 'IDLE') — safe to pass through.
+      const status = trip.status as RideStatus;
+
+      // MATCHED means Dispatch found a driver but they haven't tapped
+      // Accept yet (see trip-service's ride-state-machine.ts) — the rider
+      // stays on "Finding your driver..." and only learns who it is once
+      // the driver actually accepts, same as the FindingDriverCard/
+      // DriverMatchedCard split below.
+      if (trip.driverId && status !== 'MATCHED' && (!current.driver || current.driver.id !== trip.driverId)) {
+        const contact = await getDriverContact(trip.driverId).catch(() => null);
+        assignDriver({
+          id: trip.driverId,
+          name: contact?.name ?? 'Driver',
+          phone: contact?.phone ?? '',
+          vehicleModel: 'Vehicle details not yet tracked',
+          currentLocation: current.pickup,
+        });
+      }
+
+      if (status !== useRideStore.getState().activeRide?.status) {
+        updateRideStatus(status);
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, RIDE_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+    };
+  }, [activeRide?.id, activeRide?.status, assignDriver, updateRideStatus]);
 
   const handleRequestRide = async () => {
     if (!isAuthenticated || !user) {
@@ -182,13 +249,13 @@ export const RiderPage: React.FC = () => {
             {/* Step 2: Active Ride States */}
             {step === 'ACTIVE_RIDE' && activeRide && (
               <>
-                {(activeRide.status === 'REQUESTED' || activeRide.status === 'MATCHING') && (
-                  <FindingDriverCard onCancel={handleCancel} />
-                )}
+                {/* MATCHED = Dispatch found a driver but they haven't tapped
+                    Accept yet (see the polling effect above) — still "finding". */}
+                {(activeRide.status === 'REQUESTED' ||
+                  activeRide.status === 'MATCHING' ||
+                  activeRide.status === 'MATCHED') && <FindingDriverCard onCancel={handleCancel} />}
 
-                {(activeRide.status === 'MATCHED' ||
-                  activeRide.status === 'DRIVER_ARRIVING' ||
-                  activeRide.status === 'DRIVER_ARRIVED') && (
+                {(activeRide.status === 'DRIVER_ARRIVING' || activeRide.status === 'DRIVER_ARRIVED') && (
                   <DriverMatchedCard onCancel={handleCancel} />
                 )}
 
@@ -208,7 +275,7 @@ export const RiderPage: React.FC = () => {
         </div>
 
         {/* Right Side Full Map */}
-        <div className="flex-1 h-full min-h-[400px]">
+        <div className="flex-1 min-h-[400px]">
           <RideMap
             pickup={pickup}
             destination={destination}

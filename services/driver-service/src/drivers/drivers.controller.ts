@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { LoginDriverDto } from './dto/login-driver.dto';
 import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
+import { UpdateDriverDto } from './dto/update-driver.dto';
 import { DriversService } from './drivers.service';
 
 @ApiTags('drivers')
@@ -33,8 +34,21 @@ export class DriversController {
     return this.driversService.findVehicleType(id);
   }
 
+  // PII-limited (name + phone + vehicleType, no email/license/etc.) — this is
+  // what lets the rider assigned to this driver's trip see who's picking
+  // them up and call them, without exposing the full profile GET :id returns.
+  @Get(':id/contact')
+  async findContact(@Param('id') id: string) {
+    return this.driversService.findContact(id);
+  }
+
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateDriverStatusDto) {
     return this.driversService.updateStatus(id, dto.status);
+  }
+
+  @Patch(':id')
+  async updateProfile(@Param('id') id: string, @Body() dto: UpdateDriverDto) {
+    return this.driversService.updateProfile(id, dto);
   }
 }

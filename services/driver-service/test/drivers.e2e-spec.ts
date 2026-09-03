@@ -63,6 +63,35 @@ describe('Driver Service (e2e)', () => {
       .get(`/drivers/${createRes.body.id}`)
       .expect(200);
     expect(getRes.body.phone).toBe('+919812345670');
+    expect(getRes.body.rating).toBe(5);
+  });
+
+  it('PATCH /drivers/:id updates name/phone/email/city and persists the change', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/drivers')
+      .send({
+        name: 'Old Name',
+        phone: '+919812340001',
+        email: 'old-driver-name@example.com',
+        password: 'super-secret',
+        vehicleType: 'SEDAN',
+        ...VALID_KYC_FIELDS,
+      })
+      .expect(201);
+    const driverId = createRes.body.id;
+
+    const patchRes = await request(app.getHttpServer())
+      .patch(`/drivers/${driverId}`)
+      .send({ name: 'New Name', city: 'Chennai' })
+      .expect(200);
+
+    expect(patchRes.body.name).toBe('New Name');
+    expect(patchRes.body.city).toBe('Chennai');
+    // KYC fields untouched by this endpoint.
+    expect(patchRes.body.licenseNumber).toBe(VALID_KYC_FIELDS.licenseNumber);
+
+    const getRes = await request(app.getHttpServer()).get(`/drivers/${driverId}`).expect(200);
+    expect(getRes.body.name).toBe('New Name');
   });
 
   it('persists a status transition across a fresh Prisma connection (proves it is not in-memory)', async () => {

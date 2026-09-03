@@ -3,8 +3,9 @@
 // generated types. Generating into a service-local folder and importing it
 // by relative path avoids that collision entirely.
 generator client {
-  provider = "prisma-client-js"
-  output   = "../prisma-client"
+  provider      = "prisma-client-js"
+  output        = "../prisma-client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -19,6 +20,10 @@ model Rider {
   phone        String   @unique
   email        String   @unique
   passwordHash String   @map("password_hash")
+  // No rating-submission flow exists yet (that's a real future feature, not
+  // this pass) — this is a static display value seeded at registration, not
+  // an aggregate computed from anything.
+  rating       Float    @default(5.0)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

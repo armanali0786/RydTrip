@@ -1,5 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from '@react-google-maps/api';
+import React, { useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet-routing-machine';
+import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 import { LocationPoint } from '../../types';
 
 interface RideMapProps {
@@ -10,51 +13,30 @@ interface RideMapProps {
   interactive?: boolean;
 }
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
+const DEFAULT_CENTER: L.LatLngTuple = [17.4483, 78.3915];
 
-const DEFAULT_CENTER = { lat: 17.4483, lng: 78.3915 };
+function dotIcon(color: string): L.DivIcon {
+  return L.divIcon({
+    className: '',
+    html: `<span style="display:block;width:18px;height:18px;border-radius:9999px;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></span>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+}
 
-const mapContainerStyle = { width: '100%', height: '100%' };
+const pickupIcon = dotIcon('#000000');
+const destinationIcon = dotIcon('#282828');
 
-const mapOptions: google.maps.MapOptions = {
-  disableDefaultUI: true,
-  zoomControl: true,
-  clickableIcons: false,
-  styles: [
-    { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-    { featureType: 'transit', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-  ],
-};
-
-const pickupIcon = (): google.maps.Symbol => ({
-  path: google.maps.SymbolPath.CIRCLE,
-  scale: 9,
-  fillColor: '#000000',
-  fillOpacity: 1,
-  strokeColor: '#ffffff',
-  strokeWeight: 2,
+const driverIcon = L.divIcon({
+  className: '',
+  html: `<div style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:9999px;background:#000;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4);">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M17.402,0H5.643C4.361,0,3.322,1.034,3.322,2.31v19.38c0,1.276,1.04,2.31,2.322,2.31h11.759 c1.281,0,2.322-1.034,2.322-2.31V2.31C19.724,1.034,18.684,0,17.402,0z"/></svg>
+  </div>`,
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
 });
 
-const destinationIcon = (): google.maps.Symbol => ({
-  path: google.maps.SymbolPath.CIRCLE,
-  scale: 9,
-  fillColor: '#282828',
-  fillOpacity: 1,
-  strokeColor: '#ffffff',
-  strokeWeight: 2,
-});
-
-const driverIcon = (): google.maps.Symbol => ({
-  path: 'M17.402,0H5.643C4.361,0,3.322,1.034,3.322,2.31v19.38c0,1.276,1.04,2.31,2.322,2.31h11.759 c1.281,0,2.322-1.034,2.322-2.31V2.31C19.724,1.034,18.684,0,17.402,0z',
-  scale: 1,
-  fillColor: '#000000',
-  fillOpacity: 1,
-  strokeColor: '#ffffff',
-  strokeWeight: 1,
-  rotation: 0,
-  anchor: new google.maps.Point(12, 12),
-});
-
+/** OSM tiles + the public OSRM demo router — free, no API key, matching this project's ₹0 cost philosophy. */
 export const RideMap: React.FC<RideMapProps> = ({
   pickup,
   destination,
@@ -62,138 +44,153 @@ export const RideMap: React.FC<RideMapProps> = ({
   height = '100%',
   interactive = true,
 }) => {
-  const { isLoaded, loadError } = useJsApiLoader({
-    id: 'rydtrip-google-maps',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-  });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<{ pickup?: L.Marker; destination?: L.Marker; driver?: L.Marker }>({});
+  const routingRef = useRef<L.Routing.Control | null>(null);
 
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
-
-  const pickupPos = useMemo(
-    () => (pickup ? { lat: pickup.latitude, lng: pickup.longitude } : null),
-    [pickup]
-  );
-  const destinationPos = useMemo(
-    () => (destination ? { lat: destination.latitude, lng: destination.longitude } : null),
-    [destination]
-  );
-  const driverPos = useMemo(
-    () => (driverLocation ? { lat: driverLocation.latitude, lng: driverLocation.longitude } : null),
-    [driverLocation]
-  );
-
-  // Fetch the real driving route whenever both endpoints are known.
   useEffect(() => {
-    if (!isLoaded || !pickupPos || !destinationPos) {
-      setDirections(null);
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = L.map(containerRef.current, {
+      center: DEFAULT_CENTER,
+      zoom: 13,
+      zoomControl: interactive,
+      dragging: interactive,
+      scrollWheelZoom: interactive,
+      doubleClickZoom: interactive,
+      boxZoom: interactive,
+      keyboard: interactive,
+      touchZoom: interactive,
+    });
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    mapRef.current = map;
+
+    // Leaflet snapshots the container's pixel size once at creation and never re-checks it;
+    // if the surrounding layout resizes afterwards (sidebar content changing height/width,
+    // fonts settling, etc.) it keeps rendering tiles for the stale size, leaving the rest of
+    // the now-larger container blank. Watch for real size changes and tell it to recalculate.
+    const resizeObserver = new ResizeObserver(() => map.invalidateSize());
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      map.remove();
+      mapRef.current = null;
+      // The markers/routing control below were destroyed along with the map;
+      // clear the refs so a remount creates fresh ones instead of touching stale objects.
+      markersRef.current = {};
+      routingRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep pickup/destination/driver markers in sync with props.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const upsert = (
+      key: 'pickup' | 'destination' | 'driver',
+      point: LocationPoint | null | undefined,
+      icon: L.DivIcon,
+      title?: string
+    ) => {
+      const existing = markersRef.current[key];
+      if (!point) {
+        existing?.remove();
+        markersRef.current[key] = undefined;
+        return;
+      }
+
+      const latlng: L.LatLngExpression = [point.latitude, point.longitude];
+      if (existing) {
+        existing.setLatLng(latlng);
+      } else {
+        markersRef.current[key] = L.marker(latlng, {
+          icon,
+          title,
+          zIndexOffset: key === 'driver' ? 1000 : 0,
+        }).addTo(map);
+      }
+    };
+
+    upsert('pickup', pickup, pickupIcon, pickup?.address);
+    upsert('destination', destination, destinationIcon, destination?.address);
+    upsert('driver', driverLocation, driverIcon, 'Driver location');
+  }, [pickup, destination, driverLocation]);
+
+  // Fetch the real driving route whenever both endpoints are known. Updates the existing
+  // control's waypoints in place rather than tearing it down each time, so an in-flight
+  // OSRM request never outlives the control that started it.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!pickup || !destination) {
+      if (routingRef.current) {
+        map.removeControl(routingRef.current);
+        routingRef.current = null;
+      }
       return;
     }
 
-    const directionsService = new google.maps.DirectionsService();
-    let cancelled = false;
+    const from = L.latLng(pickup.latitude, pickup.longitude);
+    const to = L.latLng(destination.latitude, destination.longitude);
 
-    directionsService.route(
-      {
-        origin: pickupPos,
-        destination: destinationPos,
-        travelMode: google.maps.TravelMode.DRIVING,
+    if (routingRef.current) {
+      routingRef.current.setWaypoints([from, to]);
+      return;
+    }
+
+    const plan = L.Routing.plan([from, to], {
+      addWaypoints: false,
+      draggableWaypoints: false,
+      createMarker: () => false,
+    });
+
+    const control = L.Routing.control({
+      plan,
+      router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
+      show: false,
+      fitSelectedRoutes: false,
+      lineOptions: {
+        styles: [{ color: '#000000', weight: 4, opacity: 0.8 }],
+        extendToWaypoints: true,
+        missingRouteTolerance: 0,
       },
-      (result, status) => {
-        if (cancelled) return;
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          setDirections(result);
-        } else {
-          setDirections(null);
-        }
-      }
-    );
+    }).addTo(map);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoaded, pickupPos, destinationPos]);
+    // leaflet-routing-machine always injects an itinerary panel; we render our own markers/UI instead.
+    control.getContainer()?.style.setProperty('display', 'none');
+
+    routingRef.current = control;
+  }, [pickup?.latitude, pickup?.longitude, destination?.latitude, destination?.longitude]);
 
   // Fit/center the map around whatever points are currently active.
   useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
 
-    const points = [pickupPos, destinationPos, driverPos].filter(
-      (p): p is google.maps.LatLngLiteral => !!p
-    );
+    const points: L.LatLngExpression[] = [pickup, destination, driverLocation]
+      .filter((p): p is LocationPoint => !!p)
+      .map((p) => [p.latitude, p.longitude]);
 
     if (points.length > 1) {
-      const bounds = new google.maps.LatLngBounds();
-      points.forEach((p) => bounds.extend(p));
-      map.fitBounds(bounds, 50);
+      map.fitBounds(L.latLngBounds(points), { padding: [50, 50] });
     } else if (points.length === 1) {
-      map.panTo(points[0]);
-      map.setZoom(14);
+      map.setView(points[0], 14);
     }
-  }, [map, pickupPos, destinationPos, driverPos]);
-
-  const center = pickupPos || driverPos || DEFAULT_CENTER;
-
-  if (loadError) {
-    return (
-      <div
-        className="relative flex w-full items-center justify-center overflow-hidden rounded-xl bg-canvas-soft text-body-sm text-body shadow-subtle"
-        style={{ height }}
-      >
-        Unable to load Google Maps.
-      </div>
-    );
-  }
-
-  if (!isLoaded) {
-    return (
-      <div
-        className="relative flex w-full items-center justify-center overflow-hidden rounded-xl bg-canvas-soft text-body-sm text-body shadow-subtle"
-        style={{ height }}
-      >
-        Loading map…
-      </div>
-    );
-  }
+  }, [pickup, destination, driverLocation]);
 
   return (
     <div className="relative w-full overflow-hidden rounded-xl bg-canvas-soft shadow-subtle" style={{ height }}>
-      <GoogleMap
-        mapContainerStyle={mapContainerStyle}
-        center={center}
-        zoom={13}
-        options={{
-          ...mapOptions,
-          zoomControl: interactive,
-          scrollwheel: interactive,
-          gestureHandling: interactive ? 'auto' : 'none',
-          draggable: interactive,
-        }}
-        onLoad={setMap}
-        onUnmount={() => setMap(null)}
-      >
-        {directions && (
-          <DirectionsRenderer
-            directions={directions}
-            options={{
-              suppressMarkers: true,
-              polylineOptions: {
-                strokeColor: '#000000',
-                strokeWeight: 4,
-                strokeOpacity: 0.8,
-              },
-            }}
-          />
-        )}
-
-        {pickupPos && <Marker position={pickupPos} icon={pickupIcon()} title={pickup?.address} />}
-
-        {destinationPos && (
-          <Marker position={destinationPos} icon={destinationIcon()} title={destination?.address} />
-        )}
-
-        {driverPos && <Marker position={driverPos} icon={driverIcon()} title="Driver location" />}
-      </GoogleMap>
+      <div ref={containerRef} className="h-full w-full" />
 
       {/* Map Control Bar Overlay */}
       <div className="absolute top-4 right-4 z-[1000] flex gap-2">

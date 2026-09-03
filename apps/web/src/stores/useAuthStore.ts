@@ -11,6 +11,7 @@ interface BackendProfile {
   phone: string;
   email: string;
   vehicleType?: string;
+  rating?: number;
 }
 
 interface AuthResponse {
@@ -44,6 +45,8 @@ interface AuthState {
   register: (role: Role, input: RegisterInput) => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  /** Merges fields into the cached user after a successful profile PATCH — avoids a redundant re-fetch/re-login. */
+  updateUser: (patch: Partial<User>) => void;
 }
 
 // No photo/rating in any backend response yet — these are placeholder
@@ -80,8 +83,9 @@ export const useAuthStore = create<AuthState>()(
               email: profile.email,
               role,
               vehicleType: profile.vehicleType,
-              // No rating from any backend yet (see DriverInfo's own note on
-              // this) — a display-only placeholder avatar, not a fabricated stat.
+              rating: profile.rating,
+              // Still no photo from any backend — a display-only placeholder
+              // avatar, not a fabricated identity.
               avatar: role === 'RIDER' ? DEFAULT_RIDER_AVATAR : DEFAULT_DRIVER_AVATAR,
             },
             accessToken: res.accessToken,
@@ -110,6 +114,12 @@ export const useAuthStore = create<AuthState>()(
       logout: () => set({ user: null, accessToken: null, isAuthenticated: false, error: null }),
 
       clearError: () => set({ error: null }),
+
+      updateUser: (patch) => {
+        const current = get().user;
+        if (!current) return;
+        set({ user: { ...current, ...patch } });
+      },
     }),
     {
       // Bumped again: the fake-auto-login regression this fixes (DEFAULT_RIDER,

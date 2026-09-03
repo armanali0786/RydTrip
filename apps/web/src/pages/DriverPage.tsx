@@ -4,11 +4,15 @@ import { RideMap } from '../components/map/RideMap';
 import { useDriverStore } from '../stores/useDriverStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { DriverTripCard } from '../features/driver/DriverTripCard';
-import { RideRequestModal } from '../features/driver/RideRequestModal';
 import { Button } from '../components/ui/Button';
-import { wsClient } from '../websocket/client';
 import { ShieldCheck, Navigation, DollarSign, Award, RefreshCw } from 'lucide-react';
 import { RequireAuth } from '../components/auth/RequireAuth';
+import { wsClient } from '../websocket/client';
+
+// How often the dashboard polls for a Dispatch Service assignment — there's
+// no real-time push transport yet, so this is how a driver actually learns
+// they've been assigned a ride (see pollActiveTrip's own note on why).
+const ACTIVE_TRIP_POLL_MS = 4000;
 
 const DriverPageContent: React.FC = () => {
   const { user } = useAuthStore();
@@ -20,38 +24,91 @@ const DriverPageContent: React.FC = () => {
     activeTrip,
     todaysTripsCount,
     todaysEarnings,
-    setIncomingRequest,
+    syncStatusFromBackend,
+    pollActiveTrip,
   } = useDriverStore();
 
-  // Listen to WebSocket driver events (e.g. driver request received)
+  // Drives the navbar's connection badge (Live Dispatch / Local Demo Mode) —
+  // unrelated to driver online/offline status, but still needs calling or
+  // the badge is stuck showing "Offline" regardless of the real driver state.
   useEffect(() => {
     wsClient.connect();
+  }, []);
 
-    const unsubReq = wsClient.subscribe('driver.request.received', (evt) => {
-      if (status === 'ONLINE' && !activeTrip) {
-        setIncomingRequest(evt.payload);
-      }
-    });
+  // Pull the real DB status on load instead of trusting the local default —
+  // toggleOnline() only ever wrote local state before, so the UI could show
+  // ONLINE while the driver row was still OFFLINE.
+  useEffect(() => {
+    if (user?.id) {
+      syncStatusFromBackend(user.id);
+    }
+  }, [user?.id, syncStatusFromBackend]);
 
-    return () => {
-      unsubReq();
-    };
-  }, [status, activeTrip, setIncomingRequest]);
+  // Poll for a real Dispatch Service assignment the whole time the
+  // dashboard is open — not gated on `status` so a driver who's already
+  // RESERVED/ON_TRIP (e.g. after a refresh) still discovers/reconciles
+  // their in-progress trip.
+  useEffect(() => {
+    if (!user?.id) return;
+    const driverId = user.id;
+    pollActiveTrip(driverId);
+    const interval = setInterval(() => pollActiveTrip(driverId), ACTIVE_TRIP_POLL_MS);
+    return () => clearInterval(interval);
+  }, [user?.id, pollActiveTrip]);
 
-  // Simulate smooth GPS location movement when driving
+  // Real device GPS drives the driver's position when available and permitted;
+  // otherwise falls back to a simulated jitter walk (most desktop dev setups).
+  // Either way, setCurrentLocation is what pings Location Service, and a
+  // heartbeat re-sends the last known fix well inside its 30s TTL — watchPosition
+  // alone won't refire if the device simply isn't moving.
   useEffect(() => {
     if (status !== 'ONLINE' && !activeTrip) return;
 
-    const interval = setInterval(() => {
-      setCurrentLocation({
-        ...currentLocation,
-        latitude: currentLocation.latitude + (Math.random() - 0.5) * 0.001,
-        longitude: currentLocation.longitude + (Math.random() - 0.5) * 0.001,
-      });
-    }, 4000);
+    let watchId: number | null = null;
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
 
-    return () => clearInterval(interval);
-  }, [status, activeTrip, currentLocation, setCurrentLocation]);
+    const jitterTick = () => {
+      const loc = useDriverStore.getState().currentLocation;
+      setCurrentLocation({
+        ...loc,
+        latitude: loc.latitude + (Math.random() - 0.5) * 0.001,
+        longitude: loc.longitude + (Math.random() - 0.5) * 0.001,
+      });
+    };
+
+    const startFallback = () => {
+      if (fallbackInterval) return;
+      fallbackInterval = setInterval(jitterTick, 4000);
+    };
+
+    if ('geolocation' in navigator) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setCurrentLocation({
+            ...useDriverStore.getState().currentLocation,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        },
+        startFallback,
+        { enableHighAccuracy: true, maximumAge: 15000 }
+      );
+    } else {
+      startFallback();
+    }
+
+    // Register immediately on go-online instead of waiting for the first tick.
+    setCurrentLocation(useDriverStore.getState().currentLocation);
+    const heartbeat = setInterval(() => {
+      setCurrentLocation(useDriverStore.getState().currentLocation);
+    }, 15000);
+
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (fallbackInterval) clearInterval(fallbackInterval);
+      clearInterval(heartbeat);
+    };
+  }, [status, activeTrip, setCurrentLocation]);
 
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col font-text">
@@ -122,7 +179,7 @@ const DriverPageContent: React.FC = () => {
         </div>
 
         {/* Right Map View */}
-        <div className="flex-1 h-full min-h-[400px]">
+        <div className="flex-1 min-h-[400px]">
           <RideMap
             driverLocation={currentLocation}
             pickup={activeTrip?.pickup}
@@ -130,9 +187,6 @@ const DriverPageContent: React.FC = () => {
             height="100%"
           />
         </div>
-
-        {/* Incoming Ride Alert Modal with 15s Timer */}
-        <RideRequestModal />
       </main>
     </div>
   );

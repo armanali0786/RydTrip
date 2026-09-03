@@ -12,6 +12,13 @@ async function bootstrap() {
   // origin allowlist before this goes anywhere near production (Phase 11).
   app.enableCors({ origin: true, credentials: true });
 
+  // RateLimitGuard (Phase 12) keys on req.ip — without this, Express reports
+  // the immediate connection's address for every request, which behind a
+  // real load balancer (Phase 13's ALB) is always the LB itself, collapsing
+  // every distinct client into one shared bucket. `1` trusts exactly one
+  // hop's X-Forwarded-For, matching a single reverse proxy in front.
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   const config = new DocumentBuilder()
     .setTitle('API Gateway')
     .setDescription(

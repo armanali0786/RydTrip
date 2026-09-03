@@ -27,6 +27,8 @@ function toDomain(row: RideRow): Ride {
     destination: { lat: row.destinationLat, lng: row.destinationLng },
     status: row.status as RideStatus,
     cancellationReason: (row.cancellationReason as CancellationReason | null) ?? undefined,
+    fare: row.fare ?? undefined,
+    distanceKm: row.distanceKm ?? undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -121,11 +123,46 @@ export class TripsRepository {
     return row ? toDomain(row) : null;
   }
 
+  /**
+   * The driver dashboard's only way to learn Dispatch Service assigned it a
+   * ride — polled, since no real-time push transport exists yet (see
+   * docs/roadmap). "Active" excludes COMPLETED/CANCELLED; the most recent
+   * match (there's normally at most one) wins if somehow more than one ride
+   * still references this driver.
+   */
+  async findActiveByDriver(driverId: string): Promise<Ride | null> {
+    const row = await this.prisma.ride.findFirst({
+      where: { driverId, status: { notIn: [RideStatus.COMPLETED, RideStatus.CANCELLED] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return row ? toDomain(row) : null;
+  }
+
+  /** Booking-history list for a rider's profile/activity screen — most recent first. */
+  async findByRider(riderId: string, limit: number): Promise<Ride[]> {
+    const rows = await this.prisma.ride.findMany({
+      where: { riderId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    return rows.map(toDomain);
+  }
+
+  /** Booking-history list for a driver's profile/activity screen — most recent first. */
+  async findByDriver(driverId: string, limit: number): Promise<Ride[]> {
+    const rows = await this.prisma.ride.findMany({
+      where: { driverId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    return rows.map(toDomain);
+  }
+
   /** Updates ride status and appends the trip_events audit row atomically. */
   async transition(
     id: string,
     to: RideStatus,
-    options?: { cancellationReason?: CancellationReason; driverId?: string },
+    options?: { cancellationReason?: CancellationReason; driverId?: string; fare?: number; distanceKm?: number },
     tx?: TripsTx,
   ): Promise<Ride> {
     const exec = async (client: TripsTx | PrismaService) => {
@@ -135,6 +172,8 @@ export class TripsRepository {
           status: to,
           ...(options?.cancellationReason ? { cancellationReason: options.cancellationReason } : {}),
           ...(options?.driverId ? { driverId: options.driverId } : {}),
+          ...(options?.fare !== undefined ? { fare: options.fare } : {}),
+          ...(options?.distanceKm !== undefined ? { distanceKm: options.distanceKm } : {}),
         },
       });
       await client.tripEvent.create({

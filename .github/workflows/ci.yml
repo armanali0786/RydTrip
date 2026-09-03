@@ -1,0 +1,138 @@
+name: CI
+
+# Phase 12: every push/PR against main runs lint, unit tests, Testcontainers
+# integration tests, a Docker build, and an image scan. `ci-success` is the
+# single required status check branch protection points at, so a matrix
+# job's name changing later doesn't require a branch-protection update too.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION_FILE: .nvmrc
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+
+  unit-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace:
+          - services/rider-service
+          - services/driver-service
+          - services/trip-service
+          - services/location-service
+          - services/dispatch-service
+          - services/api-gateway
+          - libraries/circuit-breaker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: npm
+      # Root install (not --ignore-scripts): the three Prisma-backed
+      # services' postinstall runs `prisma generate`, which unit tests in
+      # those workspaces transitively need even without a real database.
+      - run: npm ci
+      # libraries/*/dist is gitignored (build output) — services import the
+      # compiled JS via each library's package.json "main", so it has to be
+      # built here; the local dev environment just happens to already have
+      # it built from prior work.
+      - name: Build shared libraries
+        run: npm run build --workspace=libraries/event-schema --workspace=libraries/observability --workspace=libraries/redis-client --workspace=libraries/circuit-breaker --if-present
+      # --passWithNoTests: location-service and rider-service currently have
+      # no *.spec.ts files of their own (only *.e2e-spec.ts, covered by the
+      # integration-test job) — that's a real, existing gap in this repo's
+      # test layout, not something this workflow should mask as a failure.
+      - name: Run unit tests (*.spec.ts)
+        working-directory: ${{ matrix.workspace }}
+        run: npx jest --testPathPattern='\.spec\.ts$' --passWithNoTests
+
+  integration-test:
+    runs-on: ubuntu-latest
+    # Testcontainers pulls postgres/kafka/redis images and starts real
+    # containers per test file — slower than unit tests, and a hung pull or
+    # broker bootstrap should fail the job rather than exhaust the runner's
+    # default 6h budget. Docker is preinstalled on GitHub-hosted ubuntu
+    # runners, so no extra `services:` setup is needed here.
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - rider-service
+          - driver-service
+          - trip-service
+          - location-service
+          - dispatch-service
+          - api-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: npm
+      - run: npm ci
+      - name: Build shared libraries
+        run: npm run build --workspace=libraries/event-schema --workspace=libraries/observability --workspace=libraries/redis-client --workspace=libraries/circuit-breaker --if-present
+      - name: Run integration tests (*.e2e-spec.ts)
+        working-directory: services/${{ matrix.service }}
+        run: npx jest --testPathPattern='\.e2e-spec\.ts$' --passWithNoTests
+
+  build-and-scan:
+    needs: [lint, unit-test, integration-test]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - rider-service
+          - driver-service
+          - trip-service
+          - location-service
+          - dispatch-service
+          - api-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f services/${{ matrix.service }}/Dockerfile -t rydtrip-${{ matrix.service }}:latest .
+      # Same severity/ignore-unfixed policy as scripts/scan-images.sh (Phase
+      # 11), so a local `npm run security:scan-images` run and this CI step
+      # fail on the same findings.
+      - name: Scan image for HIGH/CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: rydtrip-${{ matrix.service }}:latest
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+  ci-success:
+    if: always()
+    needs: [lint, unit-test, integration-test, build-and-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check pipeline result
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more required jobs failed."
+            exit 1
+          fi
+          echo "All required jobs passed."

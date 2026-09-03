@@ -2,14 +2,17 @@ import { RideStatus } from '@rydtrip/event-schema';
 
 /**
  * Exhaustive transition table from docs/architecture/state-machines.md.
- * Notably: IN_PROGRESS -> CANCELLED is NOT valid (see that doc for why), and
- * MATCHED -> DRIVER_ARRIVING is not independently triggerable — it happens in
- * the same transaction as driver acceptance once Dispatch exists (Phase 7).
+ * Notably: IN_PROGRESS -> CANCELLED is NOT valid (see that doc for why).
+ * MATCHED -> DRIVER_ARRIVING is the driver's own explicit accept
+ * (POST /trips/:id/accept, see trips.service.ts's accept()) — Dispatch
+ * Service only ever gets a ride to MATCHED, never past it; MATCHED ->
+ * CANCELLED is the driver's decline (POST /trips/:id/decline) or a rider
+ * cancelling before the driver has decided.
  */
 const ALLOWED_TRANSITIONS: Record<RideStatus, RideStatus[]> = {
   [RideStatus.REQUESTED]: [RideStatus.MATCHING],
   [RideStatus.MATCHING]: [RideStatus.MATCHED, RideStatus.CANCELLED],
-  [RideStatus.MATCHED]: [RideStatus.DRIVER_ARRIVING],
+  [RideStatus.MATCHED]: [RideStatus.DRIVER_ARRIVING, RideStatus.CANCELLED],
   [RideStatus.DRIVER_ARRIVING]: [RideStatus.DRIVER_ARRIVED, RideStatus.CANCELLED],
   [RideStatus.DRIVER_ARRIVED]: [RideStatus.IN_PROGRESS, RideStatus.CANCELLED],
   [RideStatus.IN_PROGRESS]: [RideStatus.COMPLETED],

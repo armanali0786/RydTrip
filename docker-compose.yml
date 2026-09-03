@@ -180,6 +180,7 @@ services:
       PORT: 3003
       DATABASE_URL: postgresql://rydtrip:rydtrip@postgres:5432/rydtrip_trips
       KAFKA_BROKERS: kafka:9092
+      DRIVER_SERVICE_URL: http://driver-service:3002
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318/v1/traces
     ports:
       - "${TRIP_HOST_PORT:-3003}:3003"

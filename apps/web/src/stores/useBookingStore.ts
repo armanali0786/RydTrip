@@ -26,24 +26,13 @@ interface BookingState {
   reset: () => void;
 }
 
-export const DEFAULT_PICKUP: LocationPoint = {
-  latitude: 17.4483,
-  longitude: 78.3915,
-  address: 'Hitec City Metro Station, Hyderabad',
-  name: 'Current Location',
-};
-
-export const DEFAULT_DESTINATION: LocationPoint = {
-  latitude: 17.4399,
-  longitude: 78.4983,
-  address: 'Secunderabad Railway Station, Hyderabad',
-  name: 'Secunderabad Station',
-};
-
 export const useBookingStore = create<BookingState>((set) => ({
   activeTab: 'ride',
-  pickup: DEFAULT_PICKUP,
-  destination: DEFAULT_DESTINATION,
+  // No hardcoded city default — LocationSearchInputs seeds this on mount
+  // from the browser's real geolocation, falling back to a real online
+  // driver's location if geolocation isn't available/permitted.
+  pickup: null,
+  destination: null,
   selectedVehicle: 'ECONOMY',
   scheduleTime: null,
   paymentMethod: 'MOCK_PAYMENT',
@@ -65,8 +54,8 @@ export const useBookingStore = create<BookingState>((set) => ({
 
   reset: () =>
     set({
-      pickup: DEFAULT_PICKUP,
-      destination: DEFAULT_DESTINATION,
+      pickup: null,
+      destination: null,
       selectedVehicle: 'ECONOMY',
       scheduleTime: null,
       nearbyVehicle: null,

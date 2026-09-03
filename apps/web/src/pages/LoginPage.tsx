@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Car, Loader2, ArrowRight, CheckCircle2, Circle } from 'lucide-react';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
@@ -11,8 +12,24 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
-  const { login, register, isLoading, error, clearError } = useAuthStore();
+  const { user, isAuthenticated, login, register, isLoading, error, clearError } = useAuthStore();
   const { showToast } = useToastStore();
+  const navigate = useNavigate();
+
+  // Only for the plain /login route (no requiredRole) — an already-logged-in
+  // visitor lands on their own dashboard instead of the form again. Deliberately
+  // NOT applied when requiredRole is set: that's RequireAuth's own fallback
+  // (which already swaps to its real children the instant isAuthenticated
+  // flips true, so this would never fire there anyway) and RiderPage's
+  // mid-booking login overlay (`<LoginPage requiredRole="RIDER" />`), where a
+  // redirect-to-dashboard here would yank the rider away from the ride they
+  // were requesting instead of letting RiderPage's own effect close the
+  // overlay and continue the booking in place.
+  useEffect(() => {
+    if (isAuthenticated && !requiredRole) {
+      navigate(user?.role === 'DRIVER' ? '/driver' : '/rider', { replace: true });
+    }
+  }, [isAuthenticated, requiredRole, user, navigate]);
 
   const [role, setRole] = useState<'RIDER' | 'DRIVER'>(requiredRole ?? 'RIDER');
   const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
@@ -32,6 +49,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
   const requiredDocuments = getRequiredDocuments(city);
   const permitRequired = requiredDocuments.find((d) => d.key === 'permitNumber')?.required ?? false;
 
+  const resetForm = () => {
+    setName('');
+    setIdentifier('');
+    setEmail('');
+    setPhone('');
+    setPassword('');
+    setVehicleType(DRIVER_VEHICLE_TYPES[0]);
+    setCity('');
+    setLicenseNumber('');
+    setVehicleRegistrationNumber('');
+    setInsurancePolicyNumber('');
+    setPermitNumber('');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
@@ -39,7 +70,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
       if (mode === 'LOGIN') {
         await login(role, identifier, password);
         showToast(`Welcome back, ${useAuthStore.getState().user?.name ?? 'there'}!`, 'success');
+        // No explicit navigate here — the isAuthenticated effect above is now
+        // the single source of truth for "leave /login once signed in" (both
+        // a fresh login and revisiting /login while already authenticated),
+        // so it's the only thing deciding where an unrestricted /login visit
+        // goes. Two redirects racing to different destinations (this used to
+        // go to '/', the effect goes to /rider or /driver) was worse than one.
       } else {
+        const registeredName = name;
         await register(role, {
           name,
           email,
@@ -49,7 +87,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ requiredRole }) => {
             ? { vehicleType, city, licenseNumber, vehicleRegistrationNumber, insurancePolicyNumber, permitNumber: permitNumber || undefined }
             : {}),
         });
-        showToast(`Account created — welcome, ${useAuthStore.getState().user?.name ?? name}!`, 'success');
+        showToast(`Account created — welcome, ${useAuthStore.getState().user?.name ?? registeredName}!`, 'success');
+        resetForm();
       }
     } catch (err) {
       // Inline banner below still shows the store's `error` — the toast is

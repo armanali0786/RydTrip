@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CancelTripDto } from './dto/cancel-trip.dto';
 import { TripsService } from './trips.service';
@@ -12,9 +12,47 @@ export class TripsController {
   // see RideEventsConsumer), not via a direct HTTP call. The Phase 2/3 bridge
   // endpoint that used to live here is retired.
 
+  // Static prefix ('driver') before the dynamic :id segment above it in this
+  // file wouldn't even collide (:id only ever matches one path segment), but
+  // it's declared first anyway for readability.
+  @Get('driver/:driverId/active')
+  async findActiveForDriver(@Param('driverId') driverId: string) {
+    // Wrapped, not returned bare: Nest sends an empty body (not JSON `null`)
+    // for a `null` return value, and the frontend's shared apiFetch always
+    // calls response.json() — which throws on an empty body. `{ ride: null }`
+    // always serializes to real JSON.
+    const ride = await this.tripsService.findActiveForDriver(driverId);
+    return { ride };
+  }
+
+  // Booking-history list, powering the rider's Activity/History page — real
+  // persisted trips, not the frontend's old client-only fake history.
+  @Get('rider/:riderId/history')
+  async findHistoryForRider(@Param('riderId') riderId: string, @Query('limit') limit?: string) {
+    const rides = await this.tripsService.findHistoryForRider(riderId, limit ? parseInt(limit, 10) : undefined);
+    return { rides };
+  }
+
+  // Same as above, driver's side.
+  @Get('driver/:driverId/history')
+  async findHistoryForDriver(@Param('driverId') driverId: string, @Query('limit') limit?: string) {
+    const rides = await this.tripsService.findHistoryForDriver(driverId, limit ? parseInt(limit, 10) : undefined);
+    return { rides };
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.tripsService.findById(id);
+  }
+
+  @Post(':id/accept')
+  async accept(@Param('id') id: string) {
+    return this.tripsService.accept(id);
+  }
+
+  @Post(':id/decline')
+  async decline(@Param('id') id: string) {
+    return this.tripsService.decline(id);
   }
 
   @Post(':id/driver-arrived')

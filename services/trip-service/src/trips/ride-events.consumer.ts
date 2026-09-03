@@ -15,7 +15,7 @@ interface RideCancelledPayload {
   reason?: CancellationReason;
 }
 
-interface DriverAcceptedPayload {
+interface DriverReservedPayload {
   rideId: string;
   driverId: string;
 }
@@ -34,8 +34,8 @@ function isRideCancelledPayload(payload: unknown): payload is RideCancelledPaylo
   return !!p && typeof p.rideId === 'string';
 }
 
-function isDriverAcceptedPayload(payload: unknown): payload is DriverAcceptedPayload {
-  const p = payload as Partial<DriverAcceptedPayload> | null;
+function isDriverReservedPayload(payload: unknown): payload is DriverReservedPayload {
+  const p = payload as Partial<DriverReservedPayload> | null;
   return !!p && typeof p.rideId === 'string' && typeof p.driverId === 'string';
 }
 
@@ -76,7 +76,7 @@ export class RideEventsConsumer implements OnModuleInit, OnModuleDestroy {
     await this.consumer.subscribe([
       KAFKA_TOPICS.RIDE_REQUESTED,
       KAFKA_TOPICS.RIDE_CANCELLED,
-      KAFKA_TOPICS.DRIVER_ACCEPTED,
+      KAFKA_TOPICS.DRIVER_RESERVED,
       KAFKA_TOPICS.DRIVER_REJECTED,
     ]);
 
@@ -104,11 +104,11 @@ export class RideEventsConsumer implements OnModuleInit, OnModuleDestroy {
           throw new Error(`malformed ${KAFKA_TOPICS.RIDE_CANCELLED} payload for eventId=${envelope.eventId}`);
         }
         await this.tripsService.handleRideCancelled(envelope.payload.rideId, envelope.payload.reason, envelope.eventId);
-      } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_ACCEPTED) {
-        if (!isDriverAcceptedPayload(envelope.payload)) {
-          throw new Error(`malformed ${KAFKA_TOPICS.DRIVER_ACCEPTED} payload for eventId=${envelope.eventId}`);
+      } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_RESERVED) {
+        if (!isDriverReservedPayload(envelope.payload)) {
+          throw new Error(`malformed ${KAFKA_TOPICS.DRIVER_RESERVED} payload for eventId=${envelope.eventId}`);
         }
-        await this.tripsService.handleDriverAccepted(envelope.payload.rideId, envelope.payload.driverId, envelope.eventId);
+        await this.tripsService.handleDriverReserved(envelope.payload.rideId, envelope.payload.driverId, envelope.eventId);
       } else if (envelope.eventType === KAFKA_TOPICS.DRIVER_REJECTED) {
         if (!isDriverRejectedPayload(envelope.payload)) {
           throw new Error(`malformed ${KAFKA_TOPICS.DRIVER_REJECTED} payload for eventId=${envelope.eventId}`);

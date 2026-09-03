@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Driver, DriverStatus } from '@rydtrip/event-schema';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
+import { UpdateDriverDto } from './dto/update-driver.dto';
 import type { Driver as DriverRow } from '../../prisma-client';
 
 function toDomain(row: DriverRow): Driver {
@@ -17,6 +18,7 @@ function toDomain(row: DriverRow): Driver {
     insurancePolicyNumber: row.insurancePolicyNumber,
     permitNumber: row.permitNumber ?? undefined,
     status: row.status as DriverStatus,
+    rating: row.rating,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -64,6 +66,19 @@ export class DriversRepository {
     const row = await this.prisma.driver.update({
       where: { id },
       data: { status },
+    });
+    return toDomain(row);
+  }
+
+  async update(id: string, dto: UpdateDriverDto): Promise<Driver> {
+    const row = await this.prisma.driver.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.email !== undefined ? { email: dto.email } : {}),
+        ...(dto.city !== undefined ? { city: dto.city } : {}),
+      },
     });
     return toDomain(row);
   }
