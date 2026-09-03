@@ -155,4 +155,20 @@ describe('API Gateway (e2e)', () => {
       .set('Authorization', `Bearer ${driverToken}`)
       .expect(502);
   });
+
+  it('rejects a driver reading a trip\'s pickup OTP with 403 — otp is rider-only', async () => {
+    await request(app.getHttpServer())
+      .get('/trips/some-trip-id/otp')
+      .set('Authorization', `Bearer ${driverToken}`)
+      .expect(403);
+  });
+
+  it('allows a rider to read a trip\'s pickup OTP (RBAC passes, request reaches the upstream)', async () => {
+    // Same reasoning as the driver-history 502 test above: TRIP_SERVICE_URL
+    // is unreachable in this suite, so getting past RBAC surfaces as 502.
+    await request(app.getHttpServer())
+      .get('/trips/some-trip-id/otp')
+      .set('Authorization', `Bearer ${riderToken}`)
+      .expect(502);
+  });
 });

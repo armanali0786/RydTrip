@@ -158,11 +158,29 @@ export class TripsRepository {
     return rows.map(toDomain);
   }
 
+  /**
+   * Raw otp lookup — deliberately bypasses toDomain()/the Ride type so the
+   * code never accidentally rides along with a general ride fetch. Used
+   * only by TripsService.start() (validation) and getOtpForRider()
+   * (the one endpoint allowed to expose it to a client).
+   */
+  async getOtp(id: string): Promise<string | null> {
+    const row = await this.prisma.ride.findUnique({ where: { id }, select: { otp: true } });
+    return row?.otp ?? null;
+  }
+
   /** Updates ride status and appends the trip_events audit row atomically. */
   async transition(
     id: string,
     to: RideStatus,
-    options?: { cancellationReason?: CancellationReason; driverId?: string; fare?: number; distanceKm?: number },
+    options?: {
+      cancellationReason?: CancellationReason;
+      driverId?: string;
+      fare?: number;
+      distanceKm?: number;
+      otp?: string;
+      clearOtp?: boolean;
+    },
     tx?: TripsTx,
   ): Promise<Ride> {
     const exec = async (client: TripsTx | PrismaService) => {
@@ -174,6 +192,8 @@ export class TripsRepository {
           ...(options?.driverId ? { driverId: options.driverId } : {}),
           ...(options?.fare !== undefined ? { fare: options.fare } : {}),
           ...(options?.distanceKm !== undefined ? { distanceKm: options.distanceKm } : {}),
+          ...(options?.otp !== undefined ? { otp: options.otp } : {}),
+          ...(options?.clearOtp ? { otp: null } : {}),
         },
       });
       await client.tripEvent.create({

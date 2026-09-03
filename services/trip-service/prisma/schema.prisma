@@ -26,6 +26,12 @@ model Ride {
   destinationLng     Float       @map("destination_lng")
   status             String
   cancellationReason String?     @map("cancellation_reason")
+  // 4-digit pickup verification code, minted on the driver's accept()
+  // (MATCHED -> DRIVER_ARRIVING) and cleared once start() succeeds — never
+  // included in the general Ride domain type/toDomain() mapping, so it can
+  // only ever reach a client through the dedicated, rider-ownership-checked
+  // GET /trips/:id/otp endpoint (see trips.controller.ts).
+  otp                String?
   // Both set only on COMPLETED, computed from pickup/destination at
   // completion time (see TripsService.complete) — there's no fare-input or
   // payment-processing flow, so these are a deterministic estimate, not a

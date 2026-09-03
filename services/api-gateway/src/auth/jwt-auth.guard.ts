@@ -95,6 +95,11 @@ const ROLE_POLICIES: readonly RolePolicy[] = [
   { method: 'GET', pattern: /^\/trips\/rider\/([^/]+)\/history$/, roles: ['rider', 'operator'], ownIdGroup: 1 },
   { method: 'GET', pattern: /^\/trips\/driver\/([^/]+)\/history$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
   { method: 'GET', pattern: /^\/trips\/[^/]+$/, roles: ['rider', 'driver', 'operator'] },
+  // Rider-only: the driver must never see this via the gateway's RBAC, even
+  // before trip-service's own ownership check (see that route's own
+  // comment) rejects a mismatched rider id. No ownIdGroup — :id here is the
+  // trip id, not the rider id, same reasoning as /trips/:id/* generally.
+  { method: 'GET', pattern: /^\/trips\/[^/]+\/otp$/, roles: ['rider', 'operator'] },
   { method: 'POST', pattern: /^\/trips\/[^/]+\/(accept|decline|driver-arrived|start|complete)$/, roles: ['driver', 'operator'] },
   { method: 'POST', pattern: /^\/trips\/[^/]+\/cancel$/, roles: ['rider', 'driver', 'operator'] },
 ];

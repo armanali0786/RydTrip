@@ -8,6 +8,7 @@ interface RideStoreState {
 
   setActiveRide: (ride: Ride | null) => void;
   updateRideStatus: (status: RideStatus) => void;
+  setOtp: (otp: string) => void;
   assignDriver: (driver: DriverInfo) => void;
   updateDriverLocation: (loc: LocationPoint) => void;
   cancelActiveRide: () => void;
@@ -41,6 +42,12 @@ export const useRideStore = create<RideStoreState>((set, get) => ({
         history: [updated, ...state.history],
       }));
     }
+  },
+
+  setOtp: (otp) => {
+    const current = get().activeRide;
+    if (!current) return;
+    set({ activeRide: { ...current, otp } });
   },
 
   assignDriver: (driver) => {
