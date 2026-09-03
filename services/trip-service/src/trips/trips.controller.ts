@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CancelTripDto } from './dto/cancel-trip.dto';
+import { StartTripDto } from './dto/start-trip.dto';
 import { TripsService } from './trips.service';
 
 @ApiTags('trips')
@@ -61,8 +62,19 @@ export class TripsController {
   }
 
   @Post(':id/start')
-  async start(@Param('id') id: string) {
-    return this.tripsService.start(id);
+  async start(@Param('id') id: string, @Body() dto: StartTripDto, @Headers('x-user-id') callerDriverId?: string) {
+    return this.tripsService.start(id, dto.otp, callerDriverId);
+  }
+
+  // The rider's own pickup OTP — never part of the general GET :id response
+  // both roles poll (see TripsService.getOtpForRider's own note). Restricted
+  // to the 'rider' role at the gateway (see jwt-auth.guard.ts's ROLE_POLICIES);
+  // the ownership check against the ride's own riderId happens here since the
+  // gateway has no trip-domain lookup of its own.
+  @Get(':id/otp')
+  async getOtp(@Param('id') id: string, @Headers('x-user-id') callerRiderId?: string) {
+    const otp = await this.tripsService.getOtpForRider(id, callerRiderId);
+    return { otp };
   }
 
   @Post(':id/complete')

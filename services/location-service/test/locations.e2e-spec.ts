@@ -33,6 +33,25 @@ describe('Location Service (e2e)', () => {
     // real 30s wait — every test in this file tolerates a 1s TTL.
     process.env.DRIVER_HEARTBEAT_TTL_SECONDS = '1';
 
+    // A brand-new single-broker KRaft cluster hasn't elected a leader for its
+    // internal __consumer_offsets topic yet — that only happens on the very
+    // first consumer group join, and can transiently fail coordinator lookups
+    // for a few seconds while it does. Absorbing that race here, inside
+    // beforeAll's generous testTimeout, means the "publishes a
+    // driver.location.updated event" test below isn't the one racing it
+    // against a tight per-test timeout.
+    const warmupConsumer = new EventConsumer(
+      createKafkaClient({ clientId: 'warmup', brokers: [bootstrapServers(kafka)] }),
+      'warmup',
+    );
+    await warmupConsumer.connect();
+    await warmupConsumer.subscribe(['driver.location.updated']);
+    // subscribe() only pre-creates the topic — the group coordinator lookup
+    // and join that's actually racy only happens once run() starts, so the
+    // warm-up has to go that far too.
+    await warmupConsumer.run(async () => {});
+    await warmupConsumer.disconnect();
+
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
@@ -66,28 +85,35 @@ describe('Location Service (e2e)', () => {
     await consumer.connect();
     await consumer.subscribe(['driver.location.updated']);
 
-    const received: Promise<EventEnvelope> = new Promise((resolve) => {
+    // consumer.run() is fire-and-forget internally — a crash (e.g. broker not
+    // yet ready for this consumer group's first join) must reject `received`
+    // too, or the test just burns its full timeout and, worse, never reaches
+    // consumer.disconnect() below, leaking a background retry loop that
+    // outlives afterAll's kafka.stop().
+    const received: Promise<EventEnvelope> = new Promise((resolve, reject) => {
       void consumer.run(async (envelope) => {
         if (envelope.correlationId === correlationId) {
           resolve(envelope);
         }
-      });
+      }).catch(reject);
     });
 
-    const res = await request(app.getHttpServer())
-      .post(`/drivers/${driverId}/location`)
-      .set('x-correlation-id', correlationId)
-      .send({ lat: ORIGIN.lat, lng: ORIGIN.lng })
-      .expect(202);
+    try {
+      const res = await request(app.getHttpServer())
+        .post(`/drivers/${driverId}/location`)
+        .set('x-correlation-id', correlationId)
+        .send({ lat: ORIGIN.lat, lng: ORIGIN.lng })
+        .expect(202);
 
-    expect(res.body).toEqual({ driverId, status: 'ACCEPTED' });
+      expect(res.body).toEqual({ driverId, status: 'ACCEPTED' });
 
-    const envelope = await received;
-    expect(envelope.eventType).toBe('driver.location.updated');
-    expect(envelope.producer).toBe('location-service');
-    expect(envelope.payload).toEqual({ driverId, lat: ORIGIN.lat, lng: ORIGIN.lng });
-
-    await consumer.disconnect();
+      const envelope = await received;
+      expect(envelope.eventType).toBe('driver.location.updated');
+      expect(envelope.producer).toBe('location-service');
+      expect(envelope.payload).toEqual({ driverId, lat: ORIGIN.lat, lng: ORIGIN.lng });
+    } finally {
+      await consumer.disconnect();
+    }
   }, 30000);
 
   it('exit criterion: GEOSEARCH returns correct nearby drivers for a known synthetic dataset', async () => {

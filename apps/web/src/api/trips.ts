@@ -58,8 +58,21 @@ export async function markDriverArrived(tripId: string): Promise<BackendTrip> {
   return apiFetch<BackendTrip>(`/trips/${tripId}/driver-arrived`, { method: 'POST' });
 }
 
-export async function startTrip(tripId: string): Promise<BackendTrip> {
-  return apiFetch<BackendTrip>(`/trips/${tripId}/start`, { method: 'POST' });
+export async function startTrip(tripId: string, otp: string): Promise<BackendTrip> {
+  return apiFetch<BackendTrip>(`/trips/${tripId}/start`, {
+    method: 'POST',
+    body: JSON.stringify({ otp }),
+  });
+}
+
+// GET /trips/:id/otp — the rider's own pickup code, read out to the driver
+// in person and entered into startTrip() above. Rider-only at the gateway
+// (see jwt-auth.guard.ts's ROLE_POLICIES); a driver's token gets a 403, and
+// this is why the code never rides along on the shared getTrip() response
+// both roles poll. `null` while the driver hasn't accepted yet.
+export async function getTripOtp(tripId: string): Promise<string | null> {
+  const res = await apiFetch<{ otp: string | null }>(`/trips/${tripId}/otp`);
+  return res.otp;
 }
 
 export async function completeTrip(tripId: string): Promise<BackendTrip> {

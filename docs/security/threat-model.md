@@ -123,3 +123,12 @@ properly means either the gateway gaining a trip-ownership lookup (against Trip
 Service, adding the domain coupling the gateway currently avoids) or trip-service doing
 the check itself. Not fixed in this phase; flagged here rather than left silently
 undocumented.
+
+**Partial exception, added with the pickup-OTP feature**: `GET /trips/:id/otp` and
+`POST /trips/:id/start` are the one place trip-service does the ownership check itself
+(comparing the gateway-forwarded `x-user-id` against the ride's own `riderId`/`driverId`)
+— because leaking the pickup code, or letting an arbitrary authenticated driver attempt
+to start someone else's trip, is a materially worse outcome than the general "can view
+any trip's status by guessing its UUID" risk described above. The rest of `/trips/:id/*`
+(`accept`, `decline`, `driver-arrived`, `complete`, the general `GET`) is unchanged by
+this and still has the gap described above.

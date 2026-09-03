@@ -64,12 +64,26 @@ endpoint exists (`GET /health/live`, `GET /health/ready`).
 | Method | Path | Purpose | Key response fields |
 |---|---|---|---|
 | `GET` | `/trips/{rideId}` | Fetch full trip state + history | current `status`, `trip_events` timeline |
+| `GET` | `/trips/{rideId}/otp` | Rider's own pickup verification code | `otp` (4-digit string, `null` before the driver accepts) |
 | `POST` | `/trips/{rideId}/driver-arrived` | Driver marks arrival at pickup | updated `status` (`DRIVER_ARRIVED`) |
-| `POST` | `/trips/{rideId}/start` | Rider boards, trip begins | updated `status` (`IN_PROGRESS`) |
+| `POST` | `/trips/{rideId}/start` | Driver enters the rider's OTP, trip begins | updated `status` (`IN_PROGRESS`) |
 | `POST` | `/trips/{rideId}/complete` | Trip ends | updated `status` (`COMPLETED`) |
 
 Every endpoint here enforces the ride state machine: a call that doesn't match a valid
 transition from the current state returns `409 Conflict`, not `500`.
+
+**Pickup OTP**: a 4-digit code is minted on the driver's `accept()` call (`MATCHED ->
+DRIVER_ARRIVING`) and cleared once `start()` succeeds. `GET /trips/{rideId}/otp` is
+restricted to the `rider` role at the gateway (`jwt-auth.guard.ts`'s `ROLE_POLICIES`) and,
+since the gateway has no trip-ownership lookup of its own (see
+[threat-model.md](../security/threat-model.md) §5), Trip Service itself checks the
+caller's `x-user-id` against the ride's own `riderId` — closing that leak for this one
+sensitive field even though the broader gap on `/trips/:id/*` remains open. `POST
+/trips/{rideId}/start` similarly checks `x-user-id` against the ride's `driverId` before
+even looking at the OTP, and returns `400` on a wrong code (the ride stays
+`DRIVER_ARRIVED`, so the driver can retry) or `403` if the caller isn't the assigned
+driver. The OTP is never included in the general `GET /trips/{rideId}` response both
+rider and driver poll — a driver has no way to read it from any endpoint.
 
 ## Common error shape (applies to every service)
 
