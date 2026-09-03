@@ -142,7 +142,7 @@ describe('Trip Service (e2e)', () => {
     expect(res.body.cancellationReason).toBe('RIDER_CANCELLED');
   });
 
-  it('consumes driver.accepted and matches the ride, advancing to DRIVER_ARRIVING', async () => {
+  it('consumes driver.reserved (MATCHED), then the driver accepting over HTTP advances to DRIVER_ARRIVING', async () => {
     const rideId = randomUUID();
     const driverId = randomUUID();
     await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideId), {
@@ -155,16 +155,20 @@ describe('Trip Service (e2e)', () => {
     );
 
     await publisher.publish(
-      KAFKA_TOPICS.DRIVER_ACCEPTED,
-      KAFKA_TOPICS.DRIVER_ACCEPTED,
+      KAFKA_TOPICS.DRIVER_RESERVED,
+      KAFKA_TOPICS.DRIVER_RESERVED,
       { rideId, driverId },
       { correlationId: randomUUID(), key: rideId },
     );
 
-    const res = await waitFor(
+    const matched = await waitFor(
       () => getTrip(rideId),
-      (r) => r.status === 200 && r.body.status === 'DRIVER_ARRIVING',
+      (r) => r.status === 200 && r.body.status === 'MATCHED',
     );
+    expect(matched.body.driverId).toBe(driverId);
+
+    const res = await request(app.getHttpServer()).post(`/trips/${rideId}/accept`).expect(201);
+    expect(res.body.status).toBe('DRIVER_ARRIVING');
     expect(res.body.driverId).toBe(driverId);
   });
 
