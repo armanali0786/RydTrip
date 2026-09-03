@@ -1,4 +1,5 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { randomInt } from 'node:crypto';
 import { CancellationReason, DriverStatus, Ride, RideStatus } from '@rydtrip/event-schema';
 import { assertValidRideTransition, InvalidRideTransitionError } from './ride-state-machine';
 import { CreateRideInput, TripsRepository, TripsTx } from './trips.repository';
@@ -87,9 +88,18 @@ export class TripsService {
     this.logger.log(`ride ${rideId} matched with driver ${driverId}, awaiting driver accept`);
   }
 
-  /** The driver's own explicit "Accept" tap — see MATCHED's own note in ride-state-machine.ts. */
+  /**
+   * The driver's own explicit "Accept" tap — see MATCHED's own note in
+   * ride-state-machine.ts. Also mints the 4-digit pickup OTP the rider will
+   * read out at pickup (see start()'s own validation) — generated here,
+   * not at ride creation, since it's meaningless before a driver exists to
+   * validate it against.
+   */
   async accept(id: string): Promise<Ride> {
-    return this.transitionTo(id, RideStatus.DRIVER_ARRIVING);
+    const ride = await this.findById(id);
+    this.guardTransition(ride.status, RideStatus.DRIVER_ARRIVING);
+    const otp = String(randomInt(0, 10000)).padStart(4, '0');
+    return this.repository.transition(id, RideStatus.DRIVER_ARRIVING, { otp });
   }
 
   /** The driver's own explicit "Decline" tap — releases them back to AVAILABLE via cancel()'s own sync. */
@@ -126,12 +136,46 @@ export class TripsService {
     return this.transitionTo(id, RideStatus.DRIVER_ARRIVED);
   }
 
-  async start(id: string): Promise<Ride> {
-    const ride = await this.transitionTo(id, RideStatus.IN_PROGRESS);
-    if (ride.driverId) {
-      await this.syncDriverStatusBestEffort(ride.driverId, DriverStatus.ON_TRIP);
+  /**
+   * Starting the trip is gated on the rider's own pickup OTP, read out to
+   * the driver in person — the one place in this codebase that verifies
+   * the *physical rider* is actually present, not just that some
+   * authenticated driver called the endpoint. `callerDriverId` (the
+   * gateway's verified `x-user-id`, see trips.controller.ts) must also
+   * match the ride's assigned driver: unlike accept/decline/driver-arrived,
+   * this action moves money/liability (a started trip), so it gets the
+   * ownership check those don't have yet (see threat-model.md §5).
+   */
+  async start(id: string, otp: string, callerDriverId?: string): Promise<Ride> {
+    const ride = await this.findById(id);
+    this.guardTransition(ride.status, RideStatus.IN_PROGRESS);
+    if (callerDriverId && ride.driverId !== callerDriverId) {
+      throw new ForbiddenException('Only the assigned driver can start this trip');
     }
-    return ride;
+    const storedOtp = await this.repository.getOtp(id);
+    if (!storedOtp || storedOtp !== otp) {
+      throw new BadRequestException('Incorrect OTP');
+    }
+    const started = await this.repository.transition(id, RideStatus.IN_PROGRESS, { clearOtp: true });
+    if (started.driverId) {
+      await this.syncDriverStatusBestEffort(started.driverId, DriverStatus.ON_TRIP);
+    }
+    return started;
+  }
+
+  /**
+   * The rider's own read of their pickup OTP — kept off the general Ride
+   * type/GET :id response (see repository.getOtp's own note) so a driver
+   * polling the same shared trip-status endpoint never sees it. `null`
+   * while the driver hasn't accepted yet (a normal, transient state during
+   * polling, not an error).
+   */
+  async getOtpForRider(id: string, callerRiderId?: string): Promise<string | null> {
+    const ride = await this.findById(id);
+    if (callerRiderId && ride.riderId !== callerRiderId) {
+      throw new ForbiddenException("Cannot view another rider's OTP");
+    }
+    return this.repository.getOtp(id);
   }
 
   async complete(id: string): Promise<Ride> {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Phone, ShieldAlert, Star, CheckCircle2, Car, Navigation, AlertCircle } from 'lucide-react';
+import { Loader2, Phone, ShieldAlert, ShieldCheck, Star, CheckCircle2, Car, Navigation, AlertCircle } from 'lucide-react';
 import { useRideStore } from '../../stores/useRideStore';
 import { Button } from '../../components/ui/Button';
 
@@ -92,6 +92,17 @@ export const DriverMatchedCard: React.FC<{ onCancel: () => void }> = ({ onCancel
           <div className="text-caption text-body">{driver?.vehicleModel || '—'}</div>
         </div>
       </div>
+
+      {/* Pickup OTP — share this with the driver in person to start the trip */}
+      {activeRide?.otp && (
+        <div className="rounded-xl border-2 border-dashed border-primary bg-canvas-soft p-4 text-center">
+          <div className="flex items-center justify-center gap-1.5 text-caption font-semibold uppercase tracking-wider text-mute">
+            <ShieldCheck className="h-4 w-4" />
+            Share this OTP with your driver to start the trip
+          </div>
+          <div className="mt-1 font-display text-display-lg font-bold tracking-[0.4em] text-ink">{activeRide.otp}</div>
+        </div>
+      )}
 
       {/* Action Buttons */}
       <div className="flex gap-3 pt-2">

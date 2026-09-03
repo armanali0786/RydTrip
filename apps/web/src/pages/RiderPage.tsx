@@ -14,7 +14,7 @@ import { useRideStore } from '../stores/useRideStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useToastStore } from '../stores/useToastStore';
 import { createRide, cancelRide } from '../api/rides';
-import { getTrip } from '../api/trips';
+import { getTrip, getTripOtp } from '../api/trips';
 import { getDriverContact } from '../api/drivers';
 import { wsClient } from '../websocket/client';
 import { ArrowLeft, X } from 'lucide-react';
@@ -41,7 +41,7 @@ const TERMINAL_STATUSES: RideStatus[] = ['COMPLETED', 'CANCELLED'];
  */
 export const RiderPage: React.FC = () => {
   const { pickup, destination, selectedVehicle, paymentMethod, nearbyVehicle } = useBookingStore();
-  const { activeRide, driverLocation, setActiveRide, updateRideStatus, assignDriver, updateDriverLocation, cancelActiveRide, resetRide } =
+  const { activeRide, driverLocation, setActiveRide, updateRideStatus, setOtp, assignDriver, updateDriverLocation, cancelActiveRide, resetRide } =
     useRideStore();
   const { user, isAuthenticated } = useAuthStore();
   const { showToast } = useToastStore();
@@ -123,6 +123,20 @@ export const RiderPage: React.FC = () => {
       if (status !== useRideStore.getState().activeRide?.status) {
         updateRideStatus(status);
       }
+
+      // The pickup OTP only exists from the driver's accept() onward (see
+      // trip-service's accept()) and is fetched once, not every tick — it
+      // never changes until the trip starts, at which point it's cleared
+      // server-side anyway and there's nothing left to show.
+      if (
+        (status === 'DRIVER_ARRIVING' || status === 'DRIVER_ARRIVED') &&
+        !useRideStore.getState().activeRide?.otp
+      ) {
+        const otp = await getTripOtp(rideId).catch(() => null);
+        if (otp && useRideStore.getState().activeRide?.id === rideId) {
+          setOtp(otp);
+        }
+      }
     };
 
     poll();
@@ -131,7 +145,7 @@ export const RiderPage: React.FC = () => {
       stopped = true;
       clearInterval(interval);
     };
-  }, [activeRide?.id, activeRide?.status, assignDriver, updateRideStatus]);
+  }, [activeRide?.id, activeRide?.status, assignDriver, updateRideStatus, setOtp]);
 
   const handleRequestRide = async () => {
     if (!isAuthenticated || !user) {

@@ -55,7 +55,7 @@ interface DriverStoreState {
   acceptTrip: () => Promise<void>;
   declineTrip: () => Promise<void>;
   arriveAtPickup: () => Promise<void>;
-  startTrip: () => Promise<void>;
+  startTrip: (otp: string) => Promise<void>;
   completeTrip: () => Promise<void>;
 }
 
@@ -262,14 +262,17 @@ export const useDriverStore = create<DriverStoreState>((set, get) => ({
     wsClient.send('ride.status.changed', { rideId: trip.id, status: 'DRIVER_ARRIVED', ride: updated });
   },
 
-  startTrip: async () => {
+  /**
+   * Unlike the other actions here, a rejected OTP is a real, expected user
+   * outcome (a mistyped or misheard code) — this rethrows so
+   * DriverTripCard can show "Incorrect OTP" inline and let the driver
+   * retry, instead of silently doing nothing like the best-effort actions
+   * above do for a stale-state 409.
+   */
+  startTrip: async (otp) => {
     const trip = get().activeTrip;
     if (!trip) return;
-    try {
-      await apiStartTrip(trip.id);
-    } catch {
-      return;
-    }
+    await apiStartTrip(trip.id, otp);
     const updated = { ...trip, status: 'IN_PROGRESS' as const };
     set({ activeTrip: updated });
     wsClient.send('ride.status.changed', { rideId: trip.id, status: 'IN_PROGRESS', ride: updated });

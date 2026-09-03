@@ -69,7 +69,7 @@ stateDiagram-v2
 | `MATCHED` | `DRIVER_ARRIVING` | Immediate, part of the same transaction as driver acceptance | Not a separately triggerable transition |
 | `DRIVER_ARRIVING` | `DRIVER_ARRIVED` | Driver marks arrival | |
 | `DRIVER_ARRIVING` | `CANCELLED` | Rider or driver cancels before pickup | |
-| `DRIVER_ARRIVED` | `IN_PROGRESS` | Rider boards / driver starts trip | |
+| `DRIVER_ARRIVED` | `IN_PROGRESS` | Rider boards / driver starts trip | Gated on the rider's 4-digit pickup OTP — see below |
 | `DRIVER_ARRIVED` | `CANCELLED` | Rider no-show past timeout, or rider cancels at the curb | |
 | `IN_PROGRESS` | `COMPLETED` | Trip ends normally | |
 
@@ -81,6 +81,14 @@ the normal state machine (out of scope — see [prd.md](prd.md)).
 states — keeps the enum small while preserving the "why"):
 `RIDER_CANCELLED`, `DRIVER_CANCELLED`, `NO_DRIVERS_AVAILABLE`, `RIDER_NO_SHOW`,
 `SYSTEM_CANCELLED`.
+
+**Pickup OTP**: `MATCHED -> DRIVER_ARRIVING` (the driver's accept) mints a 4-digit code
+on the ride, readable only by the rider (`GET /trips/{id}/otp`, see
+[api-contracts.md](api-contracts.md)). `DRIVER_ARRIVED -> IN_PROGRESS` (`start()`)
+requires that code in the request body and rejects a mismatch with `400`, leaving the
+ride at `DRIVER_ARRIVED` for the driver to retry rather than treating a mistyped code as
+a state-machine violation. This is deliberately a one-step,
+driver-enters-what-the-rider-reads-out check, not a full identity-verification flow.
 
 ## Why driver rejection doesn't change ride state
 

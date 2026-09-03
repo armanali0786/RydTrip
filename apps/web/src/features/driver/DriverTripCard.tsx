@@ -1,14 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Phone, Navigation, MapPin, CheckCircle, ShieldCheck } from 'lucide-react';
 import { useDriverStore } from '../../stores/useDriverStore';
 import { Button } from '../../components/ui/Button';
 
 export const DriverTripCard: React.FC = () => {
   const { activeTrip, acceptTrip, declineTrip, arriveAtPickup, startTrip, completeTrip } = useDriverStore();
+  const [otpInput, setOtpInput] = useState('');
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
   if (!activeTrip) return null;
 
   const isPendingAccept = activeTrip.status === 'MATCHED';
+
+  const handleStartTrip = async () => {
+    setOtpError(null);
+    setIsStarting(true);
+    try {
+      await startTrip(otpInput);
+    } catch (e) {
+      setOtpError(e instanceof Error ? e.message : 'Could not verify OTP');
+      return;
+    } finally {
+      setIsStarting(false);
+    }
+  };
 
   return (
     <div className="rounded-xl bg-canvas p-6 shadow-card border border-canvas-soft space-y-5">
@@ -90,9 +106,37 @@ export const DriverTripCard: React.FC = () => {
         )}
 
         {activeTrip.status === 'DRIVER_ARRIVED' && (
-          <Button variant="primary" size="lg" fullWidth onClick={startTrip}>
-            Start Trip
-          </Button>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1.5 flex items-center gap-1.5 text-caption font-semibold uppercase tracking-wider text-mute">
+                <ShieldCheck className="h-4 w-4" />
+                Enter the rider's 4-digit OTP to start
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={4}
+                autoComplete="one-time-code"
+                value={otpInput}
+                onChange={(e) => {
+                  setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  setOtpError(null);
+                }}
+                placeholder="0000"
+                className="w-full rounded-xl border border-canvas-softer bg-canvas-soft px-4 py-3 text-center font-display text-display-md tracking-[0.4em] text-ink focus:border-primary focus:outline-none"
+              />
+              {otpError && <p className="mt-1.5 text-body-sm font-medium text-red-600">{otpError}</p>}
+            </div>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              disabled={otpInput.length !== 4 || isStarting}
+              onClick={handleStartTrip}
+            >
+              {isStarting ? 'Verifying…' : 'Start Trip'}
+            </Button>
+          </div>
         )}
 
         {activeTrip.status === 'IN_PROGRESS' && (

@@ -371,7 +371,12 @@ describe('Trip Service (e2e)', () => {
 
     await request(app.getHttpServer()).post(`/trips/${rideId}/accept`).expect(201);
     await request(app.getHttpServer()).post(`/trips/${rideId}/driver-arrived`).expect(201);
-    await request(app.getHttpServer()).post(`/trips/${rideId}/start`).expect(201);
+
+    const otpRes = await request(app.getHttpServer()).get(`/trips/${rideId}/otp`).expect(200);
+    expect(otpRes.body.otp).toMatch(/^\d{4}$/);
+
+    await request(app.getHttpServer()).post(`/trips/${rideId}/start`).send({ otp: 'wrong' }).expect(400);
+    await request(app.getHttpServer()).post(`/trips/${rideId}/start`).send({ otp: otpRes.body.otp }).expect(201);
     const completeRes = await request(app.getHttpServer()).post(`/trips/${rideId}/complete`).expect(201);
 
     expect(completeRes.body.status).toBe('COMPLETED');

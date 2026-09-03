@@ -61,6 +61,10 @@ export interface Ride {
   paymentMethod: 'CASH' | 'MOCK_PAYMENT';
   createdAt: string;
   updatedAt: string;
+  // Rider-only pickup verification code (see api/trips.ts's getTripOtp) —
+  // never populated on the driver's side of this same client-only Ride type,
+  // since the backend never sends it in response to a driver's own token.
+  otp?: string;
 }
 
 export interface User {
