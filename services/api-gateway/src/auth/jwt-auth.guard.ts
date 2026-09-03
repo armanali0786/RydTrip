@@ -73,6 +73,7 @@ interface RolePolicy {
 // existed.
 const ROLE_POLICIES: readonly RolePolicy[] = [
   { method: 'GET', pattern: /^\/riders\/([^/]+)$/, roles: ['rider', 'operator'], ownIdGroup: 1 },
+  { method: 'PATCH', pattern: /^\/riders\/([^/]+)$/, roles: ['rider', 'operator'], ownIdGroup: 1 },
   // No ownIdGroup: the :id here is the RIDER being looked up, not the caller
   // — a driver legitimately fetches a *different* person's contact details
   // once assigned to their trip. Same class of gap as /trips/:id/* below
@@ -88,8 +89,11 @@ const ROLE_POLICIES: readonly RolePolicy[] = [
   // contact route above and /trips/:id/* below.
   { method: 'GET', pattern: /^\/drivers\/([^/]+)\/contact$/, roles: ['rider', 'operator'] },
   { method: 'PATCH', pattern: /^\/drivers\/([^/]+)\/status$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
+  { method: 'PATCH', pattern: /^\/drivers\/([^/]+)$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
   { method: 'POST', pattern: /^\/drivers\/([^/]+)\/location$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
   { method: 'GET', pattern: /^\/trips\/driver\/([^/]+)\/active$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
+  { method: 'GET', pattern: /^\/trips\/rider\/([^/]+)\/history$/, roles: ['rider', 'operator'], ownIdGroup: 1 },
+  { method: 'GET', pattern: /^\/trips\/driver\/([^/]+)\/history$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
   { method: 'GET', pattern: /^\/trips\/[^/]+$/, roles: ['rider', 'driver', 'operator'] },
   { method: 'POST', pattern: /^\/trips\/[^/]+\/(accept|decline|driver-arrived|start|complete)$/, roles: ['driver', 'operator'] },
   { method: 'POST', pattern: /^\/trips\/[^/]+\/cancel$/, roles: ['rider', 'driver', 'operator'] },

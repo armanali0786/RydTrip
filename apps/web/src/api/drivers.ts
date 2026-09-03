@@ -26,6 +26,43 @@ export async function getDriver(driverId: string): Promise<BackendDriver> {
   return apiFetch<BackendDriver>(`/drivers/${driverId}`);
 }
 
+export interface DriverProfile {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  vehicleType: string;
+  city: string;
+  licenseNumber: string;
+  vehicleRegistrationNumber: string;
+  insurancePolicyNumber: string;
+  permitNumber?: string;
+  status: BackendDriverStatus;
+  rating: number;
+  createdAt: string;
+}
+
+// GET /drivers/:id — the driver's own full profile, used by ProfilePage.
+// Distinct from getDriverContact's PII-limited shape, which is what a
+// *different* person (the matched rider) is allowed to see.
+export async function getDriverProfile(driverId: string): Promise<DriverProfile> {
+  return apiFetch<DriverProfile>(`/drivers/${driverId}`);
+}
+
+export interface UpdateDriverProfileInput {
+  name?: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+}
+
+export async function updateDriverProfile(driverId: string, input: UpdateDriverProfileInput): Promise<DriverProfile> {
+  return apiFetch<DriverProfile>(`/drivers/${driverId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+}
+
 export async function updateDriverStatus(
   driverId: string,
   status: BackendDriverStatus

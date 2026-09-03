@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { LoginDriverDto } from './dto/login-driver.dto';
 import { UpdateDriverStatusDto } from './dto/update-driver-status.dto';
+import { UpdateDriverDto } from './dto/update-driver.dto';
 import { DriversService } from './drivers.service';
 
 @ApiTags('drivers')
@@ -44,5 +45,10 @@ export class DriversController {
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateDriverStatusDto) {
     return this.driversService.updateStatus(id, dto.status);
+  }
+
+  @Patch(':id')
+  async updateProfile(@Param('id') id: string, @Body() dto: UpdateDriverDto) {
+    return this.driversService.updateProfile(id, dto);
   }
 }

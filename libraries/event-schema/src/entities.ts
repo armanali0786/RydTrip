@@ -10,6 +10,7 @@ export interface Rider {
   name: string;
   phone: string;
   email: string;
+  rating: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,6 +27,7 @@ export interface Driver {
   insurancePolicyNumber: string;
   permitNumber?: string;
   status: DriverStatus;
+  rating: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,6 +40,8 @@ export interface Ride {
   destination: GeoPoint;
   status: RideStatus;
   cancellationReason?: CancellationReason;
+  fare?: number;
+  distanceKm?: number;
   createdAt: string;
   updatedAt: string;
 }

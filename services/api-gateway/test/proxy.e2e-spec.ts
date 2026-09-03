@@ -100,4 +100,59 @@ describe('API Gateway (e2e)', () => {
       .set('Authorization', `Bearer ${driverToken}`)
       .expect(403);
   });
+
+  it('rejects a rider PATCHing another rider\'s profile with 403', async () => {
+    // riderToken's sub is 'rider-1' (see beforeAll) — a different :id is the
+    // right role but the wrong resource, same ownership check as the drivers
+    // case above, now covering the profile-update route added alongside the
+    // rider/driver profile + booking-history feature.
+    await request(app.getHttpServer())
+      .patch('/riders/a-different-rider-id')
+      .set('Authorization', `Bearer ${riderToken}`)
+      .send({ name: 'New Name' })
+      .expect(403);
+  });
+
+  it('allows a rider to PATCH their own profile (RBAC passes, request reaches the upstream)', async () => {
+    // fakeUpstream only handles POST /riders explicitly and 404s everything
+    // else — a 404 here (not 401/403) proves RBAC let the request through to
+    // the rider service rather than blocking it.
+    await request(app.getHttpServer())
+      .patch('/riders/rider-1')
+      .set('Authorization', `Bearer ${riderToken}`)
+      .send({ name: 'New Name' })
+      .expect(404);
+  });
+
+  it('rejects a driver PATCHing another driver\'s profile with 403', async () => {
+    await request(app.getHttpServer())
+      .patch('/drivers/a-different-driver-id')
+      .set('Authorization', `Bearer ${driverToken}`)
+      .send({ name: 'New Name' })
+      .expect(403);
+  });
+
+  it('rejects a rider reading another rider\'s trip history with 403', async () => {
+    await request(app.getHttpServer())
+      .get('/trips/rider/a-different-rider-id/history')
+      .set('Authorization', `Bearer ${riderToken}`)
+      .expect(403);
+  });
+
+  it('rejects a driver reading another driver\'s trip history with 403', async () => {
+    await request(app.getHttpServer())
+      .get('/trips/driver/a-different-driver-id/history')
+      .set('Authorization', `Bearer ${driverToken}`)
+      .expect(403);
+  });
+
+  it('allows a driver to read their own trip history (RBAC passes, request reaches the upstream)', async () => {
+    // TRIP_SERVICE_URL isn't stubbed in this suite, so a passed-through
+    // request fails to connect — 502, not 401/403 — proving RBAC let it
+    // through rather than blocking it (same reasoning as the 502 test above).
+    await request(app.getHttpServer())
+      .get('/trips/driver/some-id/history')
+      .set('Authorization', `Bearer ${driverToken}`)
+      .expect(502);
+  });
 });

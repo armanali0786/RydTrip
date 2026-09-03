@@ -83,23 +83,25 @@ export const Navbar: React.FC = () => {
 
           {isAuthenticated && user ? (
             <div className="flex items-center gap-2.5 bg-[#e8ebe6] border border-[#0e0f0c]/10 px-3.5 py-1.5 rounded-xl">
-              {user.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="h-7 w-7 rounded-full border border-[#0e0f0c] object-cover"
-                />
-              ) : (
-                <div className="h-7 w-7 rounded-full border border-[#0e0f0c] bg-white flex items-center justify-center text-[10px] font-black text-[#0e0f0c]">
-                  {initials(user.name)}
+              <Link to="/profile" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity" title="View profile">
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="h-7 w-7 rounded-full border border-[#0e0f0c] object-cover"
+                  />
+                ) : (
+                  <div className="h-7 w-7 rounded-full border border-[#0e0f0c] bg-white flex items-center justify-center text-[10px] font-black text-[#0e0f0c]">
+                    {initials(user.name)}
+                  </div>
+                )}
+                <div className="text-left">
+                  <div className="text-xs font-bold text-[#0e0f0c] leading-tight">{user.name}</div>
+                  <div className="text-[10px] font-semibold text-[#454745] leading-tight uppercase tracking-wider">
+                    {user.role}
+                  </div>
                 </div>
-              )}
-              <div className="text-left">
-                <div className="text-xs font-bold text-[#0e0f0c] leading-tight">{user.name}</div>
-                <div className="text-[10px] font-semibold text-[#454745] leading-tight uppercase tracking-wider">
-                  {user.role}
-                </div>
-              </div>
+              </Link>
               <button
                 type="button"
                 onClick={() => {
@@ -165,6 +167,22 @@ export const Navbar: React.FC = () => {
             >
               <Zap className="h-4 w-4" /> Dual Dispatch Mode
             </Link>
+            <Link
+              to="/history"
+              onClick={() => setMobileMenuOpen(false)}
+              className="text-base font-bold hover:text-[#054d28]"
+            >
+              Activity
+            </Link>
+            {isAuthenticated && (
+              <Link
+                to="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-base font-bold hover:text-[#054d28]"
+              >
+                Profile
+              </Link>
+            )}
           </div>
         </div>
       )}
