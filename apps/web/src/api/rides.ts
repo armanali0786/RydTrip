@@ -92,6 +92,23 @@ async function fetchNearbyDrivers(pickup: LocationPoint, radiusKm: number): Prom
   return res.drivers;
 }
 
+export interface OnlineDriverLocation {
+  driverId: string;
+  lat: number;
+  lng: number;
+}
+
+/**
+ * No reference point needed — any currently-online driver, picked
+ * arbitrarily by Location Service's Redis GEO set. Used to seed a real
+ * pickup point (instead of a hardcoded city) when the browser has no
+ * geolocation permission/support.
+ */
+export async function findAnyOnlineDriver(): Promise<OnlineDriverLocation | null> {
+  const res = await apiFetch<{ drivers: OnlineDriverLocation[] }>('/drivers/any-online?limit=1');
+  return res.drivers[0] ?? null;
+}
+
 export interface NearbyVehicleEstimate {
   option: VehicleOption;
   driverId: string;
@@ -126,6 +143,19 @@ export async function findNearbyVehicle(pickup: LocationPoint): Promise<NearbyVe
     driverId: nearest.driverId,
     driverDistanceKm: nearest.distanceKm,
   };
+}
+
+// Shared with useDriverStore's real-trip hydration (see pollActiveTrip) —
+// the assigned driver's own vehicleType/distance drive the same client-side
+// fare estimate a rider sees, since no pricing-service exists to compute
+// (or store) a real one.
+export function mapDriverVehicleType(rawVehicleType: string | undefined): VehicleType {
+  return DRIVER_VEHICLE_TYPE_MAP[rawVehicleType ?? ''] ?? 'ECONOMY';
+}
+
+export function estimateFare(vehicleType: VehicleType, distanceKm: number): number {
+  const meta = VEHICLE_METADATA[vehicleType] ?? VEHICLE_METADATA.ECONOMY;
+  return Math.round(meta.fare + distanceKm * 15);
 }
 
 // Helper to calculate distance in KM between 2 points

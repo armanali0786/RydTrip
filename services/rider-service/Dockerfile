@@ -26,6 +26,8 @@ COPY libraries/event-schema/package.json libraries/event-schema/package.json
 COPY libraries/observability/package.json libraries/observability/package.json
 COPY services/rider-service/package.json services/rider-service/package.json
 RUN npm ci --workspace=libraries/event-schema --workspace=libraries/observability --workspace=services/rider-service --include-workspace-root --omit=dev --ignore-scripts
+COPY services/rider-service/prisma services/rider-service/prisma
+RUN npx prisma generate --schema=services/rider-service/prisma/schema.prisma
 
 FROM node:22-alpine AS runtime
 RUN apk add --no-cache openssl \

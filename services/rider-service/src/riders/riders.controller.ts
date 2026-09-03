@@ -24,4 +24,12 @@ export class RidersController {
   async findOne(@Param('id') id: string) {
     return this.ridersService.findById(id);
   }
+
+  // PII-limited (name + phone only, no email) — this is what lets the
+  // driver assigned to this rider's trip see who they're picking up and
+  // call them, without exposing the full profile GET :id returns.
+  @Get(':id/contact')
+  async findContact(@Param('id') id: string) {
+    return this.ridersService.findContact(id);
+  }
 }

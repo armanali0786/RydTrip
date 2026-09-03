@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { KAFKA_TOPICS } from '@rydtrip/event-schema';
-import { NearbyDriver } from '@rydtrip/redis-client';
+import { NearbyDriver, OnlineDriver } from '@rydtrip/redis-client';
 import { KafkaPublisherService } from '../kafka/kafka-publisher.service';
 import { RedisService } from '../redis/redis.service';
 
@@ -29,5 +29,9 @@ export class LocationsService {
 
   async findNearby(lat: number, lng: number, radiusKm: number, limit: number): Promise<NearbyDriver[]> {
     return this.redis.findNearby(lat, lng, radiusKm, limit);
+  }
+
+  async findAnyOnline(limit: number): Promise<OnlineDriver[]> {
+    return this.redis.findAnyOnline(limit);
   }
 }

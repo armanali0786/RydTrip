@@ -42,6 +42,11 @@ export class RidersService {
     return rider;
   }
 
+  async findContact(id: string): Promise<{ name: string; phone: string }> {
+    const rider = await this.findById(id);
+    return { name: rider.name, phone: rider.phone };
+  }
+
   async login(dto: LoginRiderDto): Promise<AuthResult> {
     const row = await this.repository.findRowByIdentifier(dto.identifier);
     if (!row || !(await compare(dto.password, row.passwordHash))) {

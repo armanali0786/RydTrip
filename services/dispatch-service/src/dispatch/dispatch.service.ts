@@ -91,16 +91,11 @@ export class DispatchService {
         { rideId, driverId: candidate.driverId },
         { correlationId, key: rideId },
       );
-      // No human-in-the-loop accept/reject exists yet (that's the frontend's
-      // own simulated flow, not a real backend endpoint) — a won reservation
-      // is treated as accepted immediately.
-      await this.kafkaPublisher.publish(
-        KAFKA_TOPICS.DRIVER_ACCEPTED,
-        KAFKA_TOPICS.DRIVER_ACCEPTED,
-        { rideId, driverId: candidate.driverId },
-        { correlationId, key: rideId },
-      );
-      this.logger.log(`ride ${rideId} matched with driver ${candidate.driverId}`);
+      // The human-in-the-loop accept/decline step lives in Trip Service now
+      // (POST /trips/:id/accept|decline, driver-triggered) — a won
+      // reservation just means "matched, awaiting the driver's decision",
+      // not "accepted". This function's job ends at matching.
+      this.logger.log(`ride ${rideId} matched with driver ${candidate.driverId}, awaiting driver accept`);
       this.ridesProcessed.inc({ outcome: 'matched' });
       return;
     }

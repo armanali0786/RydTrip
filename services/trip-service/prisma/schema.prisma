@@ -3,8 +3,9 @@
 // generated types. Generating into a service-local folder and importing it
 // by relative path avoids that collision entirely.
 generator client {
-  provider = "prisma-client-js"
-  output   = "../prisma-client"
+  provider      = "prisma-client-js"
+  output        = "../prisma-client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

@@ -4,7 +4,6 @@ import { RideMap } from '../components/map/RideMap';
 import { RideOptionsList } from '../features/rider/RideOptionsList';
 import { FindingDriverCard, DriverMatchedCard, TripInProgressCard, TripCompletedCard } from '../features/rider/RideStatusCards';
 import { DriverTripCard } from '../features/driver/DriverTripCard';
-import { RideRequestModal } from '../features/driver/RideRequestModal';
 import { useBookingStore } from '../stores/useBookingStore';
 import { useRideStore } from '../stores/useRideStore';
 import { useDriverStore } from '../stores/useDriverStore';
@@ -15,6 +14,7 @@ import { wsClient } from '../websocket/client';
 import { Layers, ArrowRight, Zap, RefreshCw } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { RequireAuth } from '../components/auth/RequireAuth';
+import { Ride } from '../types';
 
 const DualViewPageContent: React.FC = () => {
   const { user } = useAuthStore();
@@ -24,13 +24,20 @@ const DualViewPageContent: React.FC = () => {
     useRideStore();
   const {
     status: driverStatus,
-    toggleOnline,
     currentLocation: driverCurrentLoc,
     setCurrentLocation: setDriverLoc,
     activeTrip,
     todaysEarnings,
-    setIncomingRequest,
   } = useDriverStore();
+
+  // Local-only toggle for this sandbox's driver panel — useDriverStore's own
+  // toggleOnline() now PATCHes the real driver-service record for the
+  // logged-in account's id, which this page's "driver" isn't (see the
+  // component doc comment: only the rider side is a real backend identity
+  // here). Flipping local state directly keeps the demo panel working
+  // without a real driver account behind it.
+  const toggleDriverStatusLocal = () =>
+    useDriverStore.setState((s) => ({ status: s.status === 'ONLINE' ? 'OFFLINE' : 'ONLINE' }));
 
   useEffect(() => {
     wsClient.connect();
@@ -50,10 +57,46 @@ const DualViewPageContent: React.FC = () => {
       updateDriverLocation(evt.payload.location);
     });
 
+    // This sandbox plays both rider and driver from a single logged-in
+    // account, so it can't go through the real per-driver Dispatch Service
+    // poll or the real accept/decline step (see DriverPage/DriverTripCard) —
+    // there's no second, real driver record behind this "driver" identity to
+    // poll for or accept anything on. Auto-accepting the local request the
+    // instant it arrives is a client-side-only stand-in for that step.
     const unsubDriverReq = wsClient.subscribe('driver.request.received', (evt) => {
-      if (driverStatus === 'ONLINE' && !activeTrip) {
-        setIncomingRequest(evt.payload);
-      }
+      if (driverStatus !== 'ONLINE' || activeTrip) return;
+      const req = evt.payload;
+      const driverUser = useAuthStore.getState().user;
+      if (!driverUser) return;
+
+      const newTrip: Ride = {
+        id: req.rideId,
+        riderId: req.riderId,
+        riderName: req.riderName,
+        riderPhone: req.riderPhone,
+        vehicleType: req.vehicleType,
+        pickup: req.pickup,
+        destination: req.destination,
+        fare: req.fare,
+        status: 'DRIVER_ARRIVING',
+        distanceKm: req.distanceKm,
+        durationMins: Math.round(req.distanceKm * 2.5),
+        etaMinutes: 4,
+        paymentMethod: 'MOCK_PAYMENT',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        driver: {
+          id: driverUser.id,
+          name: driverUser.name,
+          phone: driverUser.phone,
+          vehicleModel: 'Vehicle details not yet tracked',
+          currentLocation: useDriverStore.getState().currentLocation,
+        },
+      };
+
+      useDriverStore.setState({ activeTrip: newTrip, status: 'BUSY' });
+      wsClient.send('driver.assigned', { rideId: req.rideId, driver: newTrip.driver });
+      wsClient.send('ride.status.changed', { rideId: req.rideId, status: 'MATCHED', ride: newTrip });
     });
 
     return () => {
@@ -62,7 +105,7 @@ const DualViewPageContent: React.FC = () => {
       unsubDriverLoc();
       unsubDriverReq();
     };
-  }, [activeRide, driverStatus, activeTrip, updateRideStatus, assignDriver, updateDriverLocation, setIncomingRequest]);
+  }, [activeRide, driverStatus, activeTrip, updateRideStatus, assignDriver, updateDriverLocation]);
 
   const handleRiderSubmit = async () => {
     if (!pickup || !destination || !user) return;
@@ -98,7 +141,14 @@ const DualViewPageContent: React.FC = () => {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="secondary" size="sm" onClick={() => { resetRide(); useDriverStore.getState().rejectRideRequest(); }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              resetRide();
+              useDriverStore.setState({ activeTrip: null, status: 'OFFLINE' });
+            }}
+          >
             <RefreshCw className="h-3.5 w-3.5 mr-1" /> Reset Test Flow
           </Button>
         </div>
@@ -163,7 +213,7 @@ const DualViewPageContent: React.FC = () => {
             </div>
 
             <button
-              onClick={toggleOnline}
+              onClick={toggleDriverStatusLocal}
               className="rounded-pill bg-canvas text-primary px-3 py-1 text-caption font-bold"
             >
               {driverStatus === 'ONLINE' ? '🟢 ONLINE' : '🔴 OFFLINE'}
@@ -195,8 +245,6 @@ const DualViewPageContent: React.FC = () => {
           </div>
         </div>
       </main>
-
-      <RideRequestModal />
     </div>
   );
 };
