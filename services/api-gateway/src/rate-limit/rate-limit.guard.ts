@@ -20,6 +20,7 @@ const RATE_LIMIT_POLICIES: readonly RateLimitPolicy[] = [
   { method: 'POST', pattern: /^\/drivers$/, limit: 10, windowMs: 60_000, label: 'auth' },
   { method: 'POST', pattern: /^\/drivers\/login$/, limit: 10, windowMs: 60_000, label: 'auth' },
   { method: 'GET', pattern: /^\/drivers\/nearby$/, limit: 20, windowMs: 60_000, label: 'public-read' },
+  { method: 'GET', pattern: /^\/drivers\/any-online$/, limit: 20, windowMs: 60_000, label: 'public-read' },
   { method: 'GET', pattern: /^\/drivers\/[^/]+\/vehicle$/, limit: 20, windowMs: 60_000, label: 'public-read' },
 ];
 

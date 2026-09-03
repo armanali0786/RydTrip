@@ -4,11 +4,15 @@ import { RideMap } from '../components/map/RideMap';
 import { useDriverStore } from '../stores/useDriverStore';
 import { useAuthStore } from '../stores/useAuthStore';
 import { DriverTripCard } from '../features/driver/DriverTripCard';
-import { RideRequestModal } from '../features/driver/RideRequestModal';
 import { Button } from '../components/ui/Button';
-import { wsClient } from '../websocket/client';
 import { ShieldCheck, Navigation, DollarSign, Award, RefreshCw } from 'lucide-react';
 import { RequireAuth } from '../components/auth/RequireAuth';
+import { wsClient } from '../websocket/client';
+
+// How often the dashboard polls for a Dispatch Service assignment — there's
+// no real-time push transport yet, so this is how a driver actually learns
+// they've been assigned a ride (see pollActiveTrip's own note on why).
+const ACTIVE_TRIP_POLL_MS = 4000;
 
 const DriverPageContent: React.FC = () => {
   const { user } = useAuthStore();
@@ -20,23 +24,37 @@ const DriverPageContent: React.FC = () => {
     activeTrip,
     todaysTripsCount,
     todaysEarnings,
-    setIncomingRequest,
+    syncStatusFromBackend,
+    pollActiveTrip,
   } = useDriverStore();
 
-  // Listen to WebSocket driver events (e.g. driver request received)
+  // Drives the navbar's connection badge (Live Dispatch / Local Demo Mode) —
+  // unrelated to driver online/offline status, but still needs calling or
+  // the badge is stuck showing "Offline" regardless of the real driver state.
   useEffect(() => {
     wsClient.connect();
+  }, []);
 
-    const unsubReq = wsClient.subscribe('driver.request.received', (evt) => {
-      if (status === 'ONLINE' && !activeTrip) {
-        setIncomingRequest(evt.payload);
-      }
-    });
+  // Pull the real DB status on load instead of trusting the local default —
+  // toggleOnline() only ever wrote local state before, so the UI could show
+  // ONLINE while the driver row was still OFFLINE.
+  useEffect(() => {
+    if (user?.id) {
+      syncStatusFromBackend(user.id);
+    }
+  }, [user?.id, syncStatusFromBackend]);
 
-    return () => {
-      unsubReq();
-    };
-  }, [status, activeTrip, setIncomingRequest]);
+  // Poll for a real Dispatch Service assignment the whole time the
+  // dashboard is open — not gated on `status` so a driver who's already
+  // RESERVED/ON_TRIP (e.g. after a refresh) still discovers/reconciles
+  // their in-progress trip.
+  useEffect(() => {
+    if (!user?.id) return;
+    const driverId = user.id;
+    pollActiveTrip(driverId);
+    const interval = setInterval(() => pollActiveTrip(driverId), ACTIVE_TRIP_POLL_MS);
+    return () => clearInterval(interval);
+  }, [user?.id, pollActiveTrip]);
 
   // Real device GPS drives the driver's position when available and permitted;
   // otherwise falls back to a simulated jitter walk (most desktop dev setups).
@@ -169,9 +187,6 @@ const DriverPageContent: React.FC = () => {
             height="100%"
           />
         </div>
-
-        {/* Incoming Ride Alert Modal with 15s Timer */}
-        <RideRequestModal />
       </main>
     </div>
   );

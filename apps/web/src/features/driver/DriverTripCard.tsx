@@ -4,9 +4,11 @@ import { useDriverStore } from '../../stores/useDriverStore';
 import { Button } from '../../components/ui/Button';
 
 export const DriverTripCard: React.FC = () => {
-  const { activeTrip, arriveAtPickup, startTrip, completeTrip } = useDriverStore();
+  const { activeTrip, acceptTrip, declineTrip, arriveAtPickup, startTrip, completeTrip } = useDriverStore();
 
   if (!activeTrip) return null;
+
+  const isPendingAccept = activeTrip.status === 'MATCHED';
 
   return (
     <div className="rounded-xl bg-canvas p-6 shadow-card border border-canvas-soft space-y-5">
@@ -14,11 +16,13 @@ export const DriverTripCard: React.FC = () => {
       <div className="flex items-center justify-between border-b border-canvas-soft pb-4">
         <div>
           <span className="text-caption font-semibold uppercase tracking-wider text-emerald-600">
+            {isPendingAccept && 'New Ride Request'}
             {activeTrip.status === 'DRIVER_ARRIVING' && 'En Route to Pickup'}
             {activeTrip.status === 'DRIVER_ARRIVED' && 'Arrived at Pickup Location'}
             {activeTrip.status === 'IN_PROGRESS' && 'Trip in Progress'}
           </span>
           <h2 className="font-display text-display-md text-ink">
+            {isPendingAccept && 'Accept this ride?'}
             {activeTrip.status === 'DRIVER_ARRIVING' && 'Navigating to Rider'}
             {activeTrip.status === 'DRIVER_ARRIVED' && 'Waiting for Rider'}
             {activeTrip.status === 'IN_PROGRESS' && 'Driving to Destination'}
@@ -68,6 +72,17 @@ export const DriverTripCard: React.FC = () => {
 
       {/* Workflow Action Buttons */}
       <div className="pt-2">
+        {isPendingAccept && (
+          <div className="flex items-center gap-3">
+            <Button variant="subtle" size="lg" className="flex-1" onClick={declineTrip}>
+              Decline
+            </Button>
+            <Button variant="primary" size="lg" className="flex-1" onClick={acceptTrip}>
+              Accept Ride
+            </Button>
+          </div>
+        )}
+
         {activeTrip.status === 'DRIVER_ARRIVING' && (
           <Button variant="primary" size="lg" fullWidth onClick={arriveAtPickup}>
             I've Arrived at Pickup

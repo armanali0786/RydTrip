@@ -19,6 +19,12 @@ export interface NearbyDriver {
   distanceKm: number;
 }
 
+export interface OnlineDriver {
+  driverId: string;
+  lat: number;
+  lng: number;
+}
+
 /**
  * Redis GEO doesn't support per-member TTL — only whole keys expire. So
  * staleness is tracked with a companion `driver:{id}:state` hash whose TTL is
@@ -96,6 +102,48 @@ export class DriverGeoIndex {
     if (staleDriverIds.length > 0) {
       // Lazy cleanup: no point keeping a geometrically-findable member around
       // once its heartbeat has lapsed.
+      await this.redis.zrem(GEO_KEY, ...staleDriverIds);
+    }
+
+    return live;
+  }
+
+  /**
+   * No reference point needed — just any driver whose heartbeat is still
+   * live, picked arbitrarily off the geo set. Used as a last-resort seed
+   * (e.g. a rider's initial pickup point before they've typed/detected one)
+   * so there's a real, currently-online location to search around instead
+   * of a fixed hardcoded city.
+   */
+  async findAnyOnline(limit: number): Promise<OnlineDriver[]> {
+    const memberIds = await this.redis.zrange(GEO_KEY, 0, limit - 1);
+    if (memberIds.length === 0) {
+      return [];
+    }
+
+    const positions = (await this.redis.call('GEOPOS', GEO_KEY, ...memberIds)) as ([string, string] | null)[];
+
+    const stalenessPipeline = this.redis.pipeline();
+    for (const driverId of memberIds) {
+      stalenessPipeline.exists(stateKey(driverId));
+    }
+    const stalenessResults = await stalenessPipeline.exec();
+
+    const live: OnlineDriver[] = [];
+    const staleDriverIds: string[] = [];
+
+    memberIds.forEach((driverId, index) => {
+      const pos = positions[index];
+      const existsResult = stalenessResults?.[index];
+      const exists = existsResult && !existsResult[0] ? (existsResult[1] as number) : 0;
+      if (exists === 0 || !pos) {
+        staleDriverIds.push(driverId);
+        return;
+      }
+      live.push({ driverId, lat: Number(pos[1]), lng: Number(pos[0]) });
+    });
+
+    if (staleDriverIds.length > 0) {
       await this.redis.zrem(GEO_KEY, ...staleDriverIds);
     }
 

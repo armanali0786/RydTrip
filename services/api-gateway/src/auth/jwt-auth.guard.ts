@@ -22,13 +22,16 @@ export type RequestWithUser = Request & { user?: AuthenticatedUser };
 // Account creation and login are the only ways to obtain a token, so they
 // can't require one themselves. GET /drivers/nearby is public so a guest can
 // see a real fare estimate before logging in (see RiderPage's guest-browsing
-// design); it only returns driverId/coords/distance, no PII.
+// design); it only returns driverId/coords/distance, no PII. GET
+// /drivers/any-online is the same guest-facing shape, used to seed a pickup
+// point from a real online driver when geolocation isn't available.
 const PUBLIC_ROUTES: ReadonlyArray<{ method: string; path: string }> = [
   { method: 'POST', path: '/riders' },
   { method: 'POST', path: '/riders/login' },
   { method: 'POST', path: '/drivers' },
   { method: 'POST', path: '/drivers/login' },
   { method: 'GET', path: '/drivers/nearby' },
+  { method: 'GET', path: '/drivers/any-online' },
 ];
 
 // GET /drivers/:id/vehicle is the PII-free companion to /drivers/nearby above
@@ -70,13 +73,25 @@ interface RolePolicy {
 // existed.
 const ROLE_POLICIES: readonly RolePolicy[] = [
   { method: 'GET', pattern: /^\/riders\/([^/]+)$/, roles: ['rider', 'operator'], ownIdGroup: 1 },
+  // No ownIdGroup: the :id here is the RIDER being looked up, not the caller
+  // — a driver legitimately fetches a *different* person's contact details
+  // once assigned to their trip. Same class of gap as /trips/:id/* below
+  // (the gateway can't verify the driver is actually assigned to this
+  // rider's trip without a domain DB lookup it deliberately doesn't have).
+  { method: 'GET', pattern: /^\/riders\/([^/]+)\/contact$/, roles: ['driver', 'operator'] },
   { method: 'POST', pattern: /^\/rides$/, roles: ['rider', 'operator'] },
   { method: 'POST', pattern: /^\/rides\/[^/]+\/cancel$/, roles: ['rider', 'operator'] },
   { method: 'GET', pattern: /^\/drivers\/([^/]+)$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
+  // No ownIdGroup: the :id here is the DRIVER being looked up, not the
+  // caller — a rider legitimately fetches a *different* person's contact
+  // details once matched to their trip. Same class of gap as the riders
+  // contact route above and /trips/:id/* below.
+  { method: 'GET', pattern: /^\/drivers\/([^/]+)\/contact$/, roles: ['rider', 'operator'] },
   { method: 'PATCH', pattern: /^\/drivers\/([^/]+)\/status$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
   { method: 'POST', pattern: /^\/drivers\/([^/]+)\/location$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
+  { method: 'GET', pattern: /^\/trips\/driver\/([^/]+)\/active$/, roles: ['driver', 'operator'], ownIdGroup: 1 },
   { method: 'GET', pattern: /^\/trips\/[^/]+$/, roles: ['rider', 'driver', 'operator'] },
-  { method: 'POST', pattern: /^\/trips\/[^/]+\/(driver-arrived|start|complete)$/, roles: ['driver', 'operator'] },
+  { method: 'POST', pattern: /^\/trips\/[^/]+\/(accept|decline|driver-arrived|start|complete)$/, roles: ['driver', 'operator'] },
   { method: 'POST', pattern: /^\/trips\/[^/]+\/cancel$/, roles: ['rider', 'driver', 'operator'] },
 ];
 

@@ -51,6 +51,11 @@ export class DriversService {
     return { vehicleType };
   }
 
+  async findContact(id: string): Promise<{ name: string; phone: string; vehicleType: string }> {
+    const driver = await this.findById(id);
+    return { name: driver.name, phone: driver.phone, vehicleType: driver.vehicleType };
+  }
+
   async login(dto: LoginDriverDto): Promise<AuthResult> {
     const row = await this.repository.findRowByIdentifier(dto.identifier);
     if (!row || !(await compare(dto.password, row.passwordHash))) {

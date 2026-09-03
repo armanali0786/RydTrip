@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Navigation, ArrowRightLeft, LocateFixed, Loader2 } from 'lucide-react';
-import { useBookingStore, DEFAULT_PICKUP } from '../../stores/useBookingStore';
+import { useBookingStore } from '../../stores/useBookingStore';
 import { LocationPoint } from '../../types';
 import { searchPlaces, reverseGeocode, getCurrentPosition } from '../../api/geocoding';
+import { findAnyOnlineDriver } from '../../api/rides';
 
 const POPULAR_LOCATIONS: LocationPoint[] = [
   { latitude: 17.4483, longitude: 78.3915, address: 'Hitec City Metro Station, Hyderabad', name: 'Cyber Towers / Hitec City' },
@@ -69,6 +70,26 @@ export const LocationSearchInputs: React.FC = () => {
   const pickupSearch = usePlaceSearch(pickupInput, showPickupDropdown);
   const destSearch = usePlaceSearch(destinationInput, showDestDropdown);
 
+  // Last resort when geolocation is denied/unsupported: seed pickup from a
+  // real currently-online driver (Location Service's Redis GEO set) instead
+  // of a fixed hardcoded city, so the booking flow still has somewhere real
+  // to search around. If no driver is online either, pickup just stays
+  // empty and the rider types their own.
+  const useAnyOnlineDriverAsPickup = async () => {
+    try {
+      const driver = await findAnyOnlineDriver();
+      if (!driver) return;
+      const address =
+        (await reverseGeocode(driver.lat, driver.lng)) ??
+        `Near an available driver (${driver.lat.toFixed(4)}, ${driver.lng.toFixed(4)})`;
+      const loc: LocationPoint = { latitude: driver.lat, longitude: driver.lng, address, name: 'Nearby driver location' };
+      setPickup(loc);
+      setPickupInput(loc.address);
+    } catch {
+      // No online drivers either — leave pickup empty, rider types their own.
+    }
+  };
+
   const detectCurrentLocation = async () => {
     setIsDetecting(true);
     try {
@@ -80,8 +101,8 @@ export const LocationSearchInputs: React.FC = () => {
       setPickupInput(loc.address);
       setShowPickupDropdown(false);
     } catch {
-      // Permission denied, unsupported, or a network failure — silently keep
-      // whatever pickup is already set. The button stays available to retry.
+      // Permission denied, unsupported, or a network failure.
+      await useAnyOnlineDriverAsPickup();
     } finally {
       setIsDetecting(false);
     }
@@ -93,7 +114,7 @@ export const LocationSearchInputs: React.FC = () => {
   useEffect(() => {
     if (hasAutoDetected.current) return;
     hasAutoDetected.current = true;
-    if (pickup?.address === DEFAULT_PICKUP.address) {
+    if (!pickup) {
       void detectCurrentLocation();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

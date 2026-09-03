@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { CancellationReason, Ride, RideStatus } from '@rydtrip/event-schema';
+import { CancellationReason, DriverStatus, Ride, RideStatus } from '@rydtrip/event-schema';
 import { assertValidRideTransition, InvalidRideTransitionError } from './ride-state-machine';
 import { CreateRideInput, TripsRepository, TripsTx } from './trips.repository';
 
@@ -9,6 +9,7 @@ const CONSUMER_NAME = 'trip-service';
 @Injectable()
 export class TripsService {
   private readonly logger = new Logger(TripsService.name);
+  private readonly driverServiceUrl = process.env.DRIVER_SERVICE_URL ?? 'http://localhost:3002';
 
   constructor(private readonly repository: TripsRepository) {}
 
@@ -48,23 +49,33 @@ export class TripsService {
   }
 
   /**
-   * Consumes driver.accepted (Phase 7). MATCHED -> DRIVER_ARRIVING isn't
-   * independently triggerable (see ride-state-machine.ts) — both hops happen
-   * together as soon as Dispatch confirms a driver, which is what this event
-   * represents (there's no separate human accept/reject step yet).
+   * Consumes driver.reserved (Dispatch Service winning a Redis reservation
+   * for this ride). This only records the match (MATCHING -> MATCHED) — it
+   * does NOT advance to DRIVER_ARRIVING. That's the driver's own explicit
+   * decision now (see accept()/decline() below), not something Dispatch or
+   * this consumer decides on the driver's behalf.
    */
-  async handleDriverAccepted(rideId: string, driverId: string, eventId: string): Promise<void> {
+  async handleDriverReserved(rideId: string, driverId: string, eventId: string): Promise<void> {
     const ride = await this.findById(rideId);
     this.guardTransition(ride.status, RideStatus.MATCHED);
-    const outcome = await this.repository.runIdempotent(eventId, CONSUMER_NAME, async (tx) => {
-      await this.repository.transition(rideId, RideStatus.MATCHED, { driverId }, tx);
-      return this.repository.transition(rideId, RideStatus.DRIVER_ARRIVING, undefined, tx);
-    });
+    const outcome = await this.repository.runIdempotent(eventId, CONSUMER_NAME, (tx) =>
+      this.repository.transition(rideId, RideStatus.MATCHED, { driverId }, tx),
+    );
     if (!outcome.processed) {
-      this.logger.log(`skipping duplicate delivery of driver.accepted eventId=${eventId}`);
+      this.logger.log(`skipping duplicate delivery of driver.reserved eventId=${eventId}`);
       return;
     }
-    this.logger.log(`ride ${rideId} matched with driver ${driverId}, advancing to DRIVER_ARRIVING`);
+    this.logger.log(`ride ${rideId} matched with driver ${driverId}, awaiting driver accept`);
+  }
+
+  /** The driver's own explicit "Accept" tap — see MATCHED's own note in ride-state-machine.ts. */
+  async accept(id: string): Promise<Ride> {
+    return this.transitionTo(id, RideStatus.DRIVER_ARRIVING);
+  }
+
+  /** The driver's own explicit "Decline" tap — releases them back to AVAILABLE via cancel()'s own sync. */
+  async decline(id: string): Promise<Ride> {
+    return this.cancel(id, CancellationReason.DRIVER_CANCELLED);
   }
 
   /** Consumes driver.rejected (Phase 7): Dispatch exhausted every candidate. */
@@ -87,22 +98,65 @@ export class TripsService {
     return ride;
   }
 
+  /** Polled by the driver dashboard — see findActiveByDriver's own note on why. */
+  async findActiveForDriver(driverId: string): Promise<Ride | null> {
+    return this.repository.findActiveByDriver(driverId);
+  }
+
   async markDriverArrived(id: string): Promise<Ride> {
     return this.transitionTo(id, RideStatus.DRIVER_ARRIVED);
   }
 
   async start(id: string): Promise<Ride> {
-    return this.transitionTo(id, RideStatus.IN_PROGRESS);
+    const ride = await this.transitionTo(id, RideStatus.IN_PROGRESS);
+    if (ride.driverId) {
+      await this.syncDriverStatusBestEffort(ride.driverId, DriverStatus.ON_TRIP);
+    }
+    return ride;
   }
 
   async complete(id: string): Promise<Ride> {
-    return this.transitionTo(id, RideStatus.COMPLETED);
+    const ride = await this.transitionTo(id, RideStatus.COMPLETED);
+    if (ride.driverId) {
+      await this.syncDriverStatusBestEffort(ride.driverId, DriverStatus.AVAILABLE);
+    }
+    return ride;
   }
 
   async cancel(id: string, reason: CancellationReason = CancellationReason.RIDER_CANCELLED, tx?: TripsTx): Promise<Ride> {
     const ride = await this.findById(id);
     this.guardTransition(ride.status, RideStatus.CANCELLED);
-    return this.repository.transition(id, RideStatus.CANCELLED, { cancellationReason: reason }, tx);
+    const cancelled = await this.repository.transition(id, RideStatus.CANCELLED, { cancellationReason: reason }, tx);
+    // A driver is only ever attached once matched (MATCHING has none), and
+    // by the state machine above CANCELLED is only reachable from
+    // MATCHING/MATCHED/DRIVER_ARRIVING/DRIVER_ARRIVED — never IN_PROGRESS —
+    // so the driver, if any, is always still RESERVED here, never ON_TRIP.
+    if (cancelled.driverId) {
+      await this.syncDriverStatusBestEffort(cancelled.driverId, DriverStatus.AVAILABLE);
+    }
+    return cancelled;
+  }
+
+  /**
+   * Mirrors dispatch-service's own best-effort sync (see its
+   * syncDriverStatusBestEffort): driver-service's status is a durable
+   * mirror, not the hot-path source of truth, so a failed PATCH here is
+   * logged and swallowed rather than unwinding this ride's own transition —
+   * real cross-service compensation/sagas are out of scope for this project.
+   */
+  private async syncDriverStatusBestEffort(driverId: string, status: DriverStatus): Promise<void> {
+    try {
+      const res = await fetch(`${this.driverServiceUrl}/drivers/${driverId}/status`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        throw new Error(`driver-service rejected status sync for ${driverId}: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      this.logger.warn(`best-effort driver status sync to ${status} skipped for ${driverId}: ${(err as Error).message}`);
+    }
   }
 
   private async transitionTo(id: string, to: RideStatus): Promise<Ride> {

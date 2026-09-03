@@ -121,6 +121,21 @@ export class TripsRepository {
     return row ? toDomain(row) : null;
   }
 
+  /**
+   * The driver dashboard's only way to learn Dispatch Service assigned it a
+   * ride — polled, since no real-time push transport exists yet (see
+   * docs/roadmap). "Active" excludes COMPLETED/CANCELLED; the most recent
+   * match (there's normally at most one) wins if somehow more than one ride
+   * still references this driver.
+   */
+  async findActiveByDriver(driverId: string): Promise<Ride | null> {
+    const row = await this.prisma.ride.findFirst({
+      where: { driverId, status: { notIn: [RideStatus.COMPLETED, RideStatus.CANCELLED] } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return row ? toDomain(row) : null;
+  }
+
   /** Updates ride status and appends the trip_events audit row atomically. */
   async transition(
     id: string,
