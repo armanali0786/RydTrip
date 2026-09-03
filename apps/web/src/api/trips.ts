@@ -17,6 +17,14 @@ export interface BackendTrip {
   pickup: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   status: BackendRideStatus;
+  cancellationReason?: string;
+  // Set only once the trip reaches COMPLETED (see trips.service.ts's
+  // complete()) — a deterministic distance-based estimate, not a real
+  // charged amount (no payment processor exists). Absent otherwise.
+  fare?: number;
+  distanceKm?: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // GET /trips/driver/:driverId/active -> the driver's currently assigned ride
@@ -56,4 +64,17 @@ export async function startTrip(tripId: string): Promise<BackendTrip> {
 
 export async function completeTrip(tripId: string): Promise<BackendTrip> {
   return apiFetch<BackendTrip>(`/trips/${tripId}/complete`, { method: 'POST' });
+}
+
+// GET /trips/rider/:riderId/history — real, persisted booking history for
+// the rider's Activity page (replacing the old client-only fake history).
+export async function getRideHistoryForRider(riderId: string, limit = 20): Promise<BackendTrip[]> {
+  const res = await apiFetch<{ rides: BackendTrip[] }>(`/trips/rider/${riderId}/history?limit=${limit}`);
+  return res.rides;
+}
+
+// Same as above, driver's side.
+export async function getRideHistoryForDriver(driverId: string, limit = 20): Promise<BackendTrip[]> {
+  const res = await apiFetch<{ rides: BackendTrip[] }>(`/trips/driver/${driverId}/history?limit=${limit}`);
+  return res.rides;
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CancelTripDto } from './dto/cancel-trip.dto';
 import { TripsService } from './trips.service';
@@ -23,6 +23,21 @@ export class TripsController {
     // always serializes to real JSON.
     const ride = await this.tripsService.findActiveForDriver(driverId);
     return { ride };
+  }
+
+  // Booking-history list, powering the rider's Activity/History page — real
+  // persisted trips, not the frontend's old client-only fake history.
+  @Get('rider/:riderId/history')
+  async findHistoryForRider(@Param('riderId') riderId: string, @Query('limit') limit?: string) {
+    const rides = await this.tripsService.findHistoryForRider(riderId, limit ? parseInt(limit, 10) : undefined);
+    return { rides };
+  }
+
+  // Same as above, driver's side.
+  @Get('driver/:driverId/history')
+  async findHistoryForDriver(@Param('driverId') driverId: string, @Query('limit') limit?: string) {
+    const rides = await this.tripsService.findHistoryForDriver(driverId, limit ? parseInt(limit, 10) : undefined);
+    return { rides };
   }
 
   @Get(':id')

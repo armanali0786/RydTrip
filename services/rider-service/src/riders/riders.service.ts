@@ -5,6 +5,7 @@ import { Rider } from '@rydtrip/event-schema';
 import { Prisma } from '../../prisma-client';
 import { CreateRiderDto } from './dto/create-rider.dto';
 import { LoginRiderDto } from './dto/login-rider.dto';
+import { UpdateRiderDto } from './dto/update-rider.dto';
 import { RidersRepository } from './riders.repository';
 
 const PASSWORD_SALT_ROUNDS = 10;
@@ -47,6 +48,19 @@ export class RidersService {
     return { name: rider.name, phone: rider.phone };
   }
 
+  async updateProfile(id: string, dto: UpdateRiderDto): Promise<Rider> {
+    await this.findById(id);
+    try {
+      return await this.repository.update(id, dto);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[] | undefined)?.join(', ') ?? 'phone or email';
+        throw new ConflictException(`A rider with this ${target} is already registered`);
+      }
+      throw err;
+    }
+  }
+
   async login(dto: LoginRiderDto): Promise<AuthResult> {
     const row = await this.repository.findRowByIdentifier(dto.identifier);
     if (!row || !(await compare(dto.password, row.passwordHash))) {
@@ -58,6 +72,7 @@ export class RidersService {
       name: row.name,
       phone: row.phone,
       email: row.email,
+      rating: row.rating,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

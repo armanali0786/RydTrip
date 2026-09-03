@@ -26,12 +26,18 @@ model Ride {
   destinationLng     Float       @map("destination_lng")
   status             String
   cancellationReason String?     @map("cancellation_reason")
+  // Both set only on COMPLETED, computed from pickup/destination at
+  // completion time (see TripsService.complete) — there's no fare-input or
+  // payment-processing flow, so these are a deterministic estimate, not a
+  // real charged amount. Null for every other status, including CANCELLED.
+  fare               Float?
+  distanceKm         Float?      @map("distance_km")
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt          DateTime    @updatedAt @map("updated_at")
   events             TripEvent[]
 
   @@index([riderId, createdAt])
-  @@index([driverId])
+  @@index([driverId, createdAt])
   @@index([status])
   @@map("rides")
 }

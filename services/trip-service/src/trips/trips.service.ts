@@ -6,6 +6,25 @@ import { CreateRideInput, TripsRepository, TripsTx } from './trips.repository';
 /** Matches the Kafka consumer group id in ride-events.consumer.ts — the processed_events key. */
 const CONSUMER_NAME = 'trip-service';
 
+/** Flat-rate fare model — no surge/time-of-day pricing, no payment processor. INR. */
+const BASE_FARE = 40;
+const PER_KM_RATE = 12;
+const EARTH_RADIUS_KM = 6371;
+
+const DEFAULT_HISTORY_LIMIT = 20;
+const MAX_HISTORY_LIMIT = 50;
+
+/** Great-circle distance between pickup and destination — the only distance signal this system has (no routing/traffic engine). */
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
+}
+
 @Injectable()
 export class TripsService {
   private readonly logger = new Logger(TripsService.name);
@@ -116,11 +135,25 @@ export class TripsService {
   }
 
   async complete(id: string): Promise<Ride> {
-    const ride = await this.transitionTo(id, RideStatus.COMPLETED);
+    const current = await this.findById(id);
+    this.guardTransition(current.status, RideStatus.COMPLETED);
+    const distanceKm = Math.round(haversineKm(current.pickup, current.destination) * 100) / 100;
+    const fare = Math.round(BASE_FARE + PER_KM_RATE * distanceKm);
+    const ride = await this.repository.transition(id, RideStatus.COMPLETED, { fare, distanceKm });
     if (ride.driverId) {
       await this.syncDriverStatusBestEffort(ride.driverId, DriverStatus.AVAILABLE);
     }
     return ride;
+  }
+
+  /** Booking-history list for a rider's profile/activity screen — most recent first, capped. */
+  async findHistoryForRider(riderId: string, limit = DEFAULT_HISTORY_LIMIT): Promise<Ride[]> {
+    return this.repository.findByRider(riderId, Math.min(Math.max(limit, 1), MAX_HISTORY_LIMIT));
+  }
+
+  /** Booking-history list for a driver's profile/activity screen — most recent first, capped. */
+  async findHistoryForDriver(driverId: string, limit = DEFAULT_HISTORY_LIMIT): Promise<Ride[]> {
+    return this.repository.findByDriver(driverId, Math.min(Math.max(limit, 1), MAX_HISTORY_LIMIT));
   }
 
   async cancel(id: string, reason: CancellationReason = CancellationReason.RIDER_CANCELLED, tx?: TripsTx): Promise<Ride> {

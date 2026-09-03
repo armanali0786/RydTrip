@@ -27,6 +27,10 @@ model Driver {
   insurancePolicyNumber      String  @default("") @map("insurance_policy_number")
   permitNumber               String? @map("permit_number")
   status       String   @default("OFFLINE")
+  // No rating-submission flow exists yet (that's a real future feature, not
+  // this pass) — this is a static display value seeded at registration, not
+  // an aggregate computed from anything.
+  rating       Float    @default(5.0)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

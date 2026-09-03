@@ -5,6 +5,7 @@ import { Driver, DriverStatus } from '@rydtrip/event-schema';
 import { Prisma } from '../../prisma-client';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { LoginDriverDto } from './dto/login-driver.dto';
+import { UpdateDriverDto } from './dto/update-driver.dto';
 import { assertValidDriverTransition, InvalidDriverTransitionError } from './driver-state-machine';
 import { DriversRepository } from './drivers.repository';
 
@@ -74,6 +75,7 @@ export class DriversService {
       insurancePolicyNumber: row.insurancePolicyNumber,
       permitNumber: row.permitNumber ?? undefined,
       status: row.status as DriverStatus,
+      rating: row.rating,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
@@ -101,5 +103,18 @@ export class DriversService {
     }
 
     return this.repository.updateStatus(id, targetStatus);
+  }
+
+  async updateProfile(id: string, dto: UpdateDriverDto): Promise<Driver> {
+    await this.findById(id);
+    try {
+      return await this.repository.update(id, dto);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const target = (err.meta?.target as string[] | undefined)?.join(', ') ?? 'phone or email';
+        throw new ConflictException(`A driver with this ${target} is already registered`);
+      }
+      throw err;
+    }
   }
 }

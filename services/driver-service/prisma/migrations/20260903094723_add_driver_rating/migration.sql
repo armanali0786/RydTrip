@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "drivers" ADD COLUMN     "rating" DOUBLE PRECISION NOT NULL DEFAULT 5.0;

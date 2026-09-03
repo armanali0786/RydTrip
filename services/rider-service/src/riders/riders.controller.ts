@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { CreateRiderDto } from './dto/create-rider.dto';
 import { LoginRiderDto } from './dto/login-rider.dto';
+import { UpdateRiderDto } from './dto/update-rider.dto';
 import { RidersService } from './riders.service';
 
 @ApiTags('riders')
@@ -31,5 +32,10 @@ export class RidersController {
   @Get(':id/contact')
   async findContact(@Param('id') id: string) {
     return this.ridersService.findContact(id);
+  }
+
+  @Patch(':id')
+  async updateProfile(@Param('id') id: string, @Body() dto: UpdateRiderDto) {
+    return this.ridersService.updateProfile(id, dto);
   }
 }

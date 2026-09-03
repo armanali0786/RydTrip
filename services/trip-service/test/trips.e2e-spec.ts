@@ -345,4 +345,101 @@ describe('Trip Service (e2e)', () => {
     },
     30000,
   );
+
+  it('completes a ride through the full driver flow and computes fare/distanceKm from pickup/destination', async () => {
+    const rideId = randomUUID();
+    const driverId = randomUUID();
+    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideId), {
+      correlationId: randomUUID(),
+      key: rideId,
+    });
+    await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
+
+    await publisher.publish(
+      KAFKA_TOPICS.DRIVER_RESERVED,
+      KAFKA_TOPICS.DRIVER_RESERVED,
+      { rideId, driverId },
+      { correlationId: randomUUID(), key: rideId },
+    );
+    await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'MATCHED',
+    );
+
+    await request(app.getHttpServer()).post(`/trips/${rideId}/accept`).expect(201);
+    await request(app.getHttpServer()).post(`/trips/${rideId}/driver-arrived`).expect(201);
+    await request(app.getHttpServer()).post(`/trips/${rideId}/start`).expect(201);
+    const completeRes = await request(app.getHttpServer()).post(`/trips/${rideId}/complete`).expect(201);
+
+    expect(completeRes.body.status).toBe('COMPLETED');
+    // pickup {12.9716, 77.5946} -> destination {12.9352, 77.6146}, great-circle ~4.4km.
+    expect(completeRes.body.distanceKm).toBeGreaterThan(3);
+    expect(completeRes.body.distanceKm).toBeLessThan(6);
+    expect(completeRes.body.fare).toBe(Math.round(40 + 12 * completeRes.body.distanceKm));
+
+    const getRes = await getTrip(rideId).expect(200);
+    expect(getRes.body.fare).toBe(completeRes.body.fare);
+    expect(getRes.body.distanceKm).toBe(completeRes.body.distanceKm);
+  });
+
+  it('GET /trips/rider/:riderId/history returns that rider\'s rides, most recent first', async () => {
+    const riderId = randomUUID();
+    const rideA = randomUUID();
+    const rideB = randomUUID();
+
+    await publisher.publish(
+      KAFKA_TOPICS.RIDE_REQUESTED,
+      KAFKA_TOPICS.RIDE_REQUESTED,
+      { rideId: rideA, riderId, pickup: { lat: 12.9716, lng: 77.5946 }, destination: { lat: 12.9352, lng: 77.6146 } },
+      { correlationId: randomUUID(), key: rideA },
+    );
+    await waitFor(
+      () => getTrip(rideA),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
+
+    await publisher.publish(
+      KAFKA_TOPICS.RIDE_REQUESTED,
+      KAFKA_TOPICS.RIDE_REQUESTED,
+      { rideId: rideB, riderId, pickup: { lat: 12.9716, lng: 77.5946 }, destination: { lat: 12.9352, lng: 77.6146 } },
+      { correlationId: randomUUID(), key: rideB },
+    );
+    await waitFor(
+      () => getTrip(rideB),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
+
+    const historyRes = await request(app.getHttpServer()).get(`/trips/rider/${riderId}/history`).expect(200);
+    const ids = historyRes.body.rides.map((r: { id: string }) => r.id);
+    expect(ids).toEqual([rideB, rideA]);
+  });
+
+  it('GET /trips/driver/:driverId/history returns that driver\'s rides', async () => {
+    const driverId = randomUUID();
+    const rideId = randomUUID();
+    await publisher.publish(KAFKA_TOPICS.RIDE_REQUESTED, KAFKA_TOPICS.RIDE_REQUESTED, tripPayload(rideId), {
+      correlationId: randomUUID(),
+      key: rideId,
+    });
+    await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'MATCHING',
+    );
+    await publisher.publish(
+      KAFKA_TOPICS.DRIVER_RESERVED,
+      KAFKA_TOPICS.DRIVER_RESERVED,
+      { rideId, driverId },
+      { correlationId: randomUUID(), key: rideId },
+    );
+    await waitFor(
+      () => getTrip(rideId),
+      (r) => r.status === 200 && r.body.status === 'MATCHED',
+    );
+
+    const historyRes = await request(app.getHttpServer()).get(`/trips/driver/${driverId}/history`).expect(200);
+    expect(historyRes.body.rides.map((r: { id: string }) => r.id)).toContain(rideId);
+  });
 });

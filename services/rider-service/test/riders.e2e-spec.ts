@@ -61,6 +61,47 @@ describe('Rider Service (e2e)', () => {
       .get(`/riders/${createRes.body.id}`)
       .expect(200);
     expect(getRes.body.name).toBe('Priya Sharma');
+    expect(getRes.body.rating).toBe(5);
+  });
+
+  it('PATCH /riders/:id updates name/phone/email and persists the change', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/riders')
+      .send({ name: 'Old Name', phone: '+911234512121', email: 'old-name@example.com', password: 'super-secret' })
+      .expect(201);
+    const riderId = createRes.body.id;
+
+    const patchRes = await request(app.getHttpServer())
+      .patch(`/riders/${riderId}`)
+      .send({ name: 'New Name', phone: '+911234513131' })
+      .expect(200);
+
+    expect(patchRes.body.name).toBe('New Name');
+    expect(patchRes.body.phone).toBe('+911234513131');
+    expect(patchRes.body.email).toBe('old-name@example.com');
+
+    const getRes = await request(app.getHttpServer()).get(`/riders/${riderId}`).expect(200);
+    expect(getRes.body.name).toBe('New Name');
+  });
+
+  it('PATCH /riders/:id rejects a phone/email already taken by another rider with 409', async () => {
+    await request(app.getHttpServer())
+      .post('/riders')
+      .send({ name: 'Taken Phone', phone: '+911234514141', email: 'taken-phone@example.com', password: 'super-secret' })
+      .expect(201);
+    const secondRes = await request(app.getHttpServer())
+      .post('/riders')
+      .send({ name: 'Wants Taken Phone', phone: '+911234515151', email: 'wants-taken-phone@example.com', password: 'super-secret' })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/riders/${secondRes.body.id}`)
+      .send({ phone: '+911234514141' })
+      .expect(409);
+  });
+
+  it('PATCH /riders/:id returns 404 for an unknown rider', async () => {
+    await request(app.getHttpServer()).patch(`/riders/${randomUUID()}`).send({ name: 'Nobody' }).expect(404);
   });
 
   it('persists across a fresh Prisma connection (proves it is not in-memory)', async () => {
