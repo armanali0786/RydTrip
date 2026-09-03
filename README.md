@@ -88,6 +88,31 @@ flowchart TD
     TripSvc -->|"Update State (ACCEPTED)"| Postgres
 ```
 
+```mermaid
+sequenceDiagram
+    participant U as Rider/Driver (browser)
+    participant GW as API Gateway
+    participant Svc as Rider/Driver Service
+
+    U->>GW: POST /riders (or /drivers) — register
+    GW->>Svc: forward (public route, no token needed)
+    Svc->>Svc: hash password, persist profile
+    Svc-->>U: 201 profile
+
+    U->>GW: POST /riders/login { identifier, password }
+    GW->>Svc: forward (public route)
+    Svc->>Svc: verify bcrypt hash
+    Svc->>Svc: sign JWT { sub, role, phone }
+    Svc-->>U: 200 { accessToken, rider }
+    U->>U: store token + profile (useAuthStore)
+
+    U->>GW: any subsequent request, Authorization: Bearer <token>
+    GW->>GW: JwtAuthGuard verifies signature + expiry
+    GW->>GW: RBAC check (role, and ownership for own-resource routes)
+    GW->>Svc: forward if authorized, else 401/403
+```
+
+
 ### End-to-End Dispatch Flow
 1. **Booking Request**: Rider submits pickup and dropoff points via the **HeroRideForm** on the web app.
 2. **API Routing**: The **API Gateway** validates JWT tokens and routes request to **Trip Service**.
