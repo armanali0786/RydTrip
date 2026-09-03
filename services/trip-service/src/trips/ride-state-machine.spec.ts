@@ -8,6 +8,7 @@ const VALID_TRANSITIONS: [RideStatus, RideStatus][] = [
   [RideStatus.MATCHING, RideStatus.MATCHED],
   [RideStatus.MATCHING, RideStatus.CANCELLED],
   [RideStatus.MATCHED, RideStatus.DRIVER_ARRIVING],
+  [RideStatus.MATCHED, RideStatus.CANCELLED],
   [RideStatus.DRIVER_ARRIVING, RideStatus.DRIVER_ARRIVED],
   [RideStatus.DRIVER_ARRIVING, RideStatus.CANCELLED],
   [RideStatus.DRIVER_ARRIVED, RideStatus.IN_PROGRESS],
