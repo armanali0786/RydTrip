@@ -1,7 +1,7 @@
 {
   "name": "rydtrip",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Cost-optimized real-time distributed ride dispatch platform",
   "workspaces": [
     "services/*",
