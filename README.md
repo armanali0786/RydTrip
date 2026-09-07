@@ -4,28 +4,6 @@
 
 ---
 
-## 📸 Visual Showcase
-![RydTrip Brand Banner](docs/images/rydtrip-banner.png)
-### 1. Rider Booking & Search Interface
-<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-52-43" src="https://github.com/user-attachments/assets/40a83259-cbc4-4251-8013-c6efe014f263" />
-
-### 2. Driver Partner Program & Real-Time Earnings
-<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-01" src="https://github.com/user-attachments/assets/175d698e-5ded-4d2c-b413-1f3a170b1b82" />
-
-
-### 3. Distributed Platform Features & Mobile Apps
-<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-08" src="https://github.com/user-attachments/assets/f30d0281-9478-447f-8e3a-cde765217edb" />
-oad.png)
-
-<img width="1854" height="887" alt="Screenshot from 2026-09-02 13-10-36" src="https://github.com/user-attachments/assets/cd58d7c4-7028-49cc-9fa1-9004d203f9d0" />
-
-
-<img width="1854" height="887" alt="Screenshot from 2026-09-02 13-10-36" src="https://github.com/user-attachments/assets/7708ce08-88af-44ff-803c-49e13430e456" />
-
-
-<img width="1854" height="930" alt="Screenshot from 2026-09-02 13-10-47" src="https://github.com/user-attachments/assets/8672b5a3-790c-44fb-8cf3-2f0349d999ec" />
-
-<img width="1854" height="930" alt="Screenshot from 2026-09-02 13-10-53" src="https://github.com/user-attachments/assets/95b16b3d-77c8-4134-9470-40a56fcf6c30" />
 
 
 
@@ -220,3 +198,26 @@ npm run dev --workspace=@rydtrip/web
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+## 📸 Visual Showcase
+![RydTrip Brand Banner](docs/images/rydtrip-banner.png)
+### 1. Rider Booking & Search Interface
+<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-52-43" src="https://github.com/user-attachments/assets/40a83259-cbc4-4251-8013-c6efe014f263" />
+
+### 2. Driver Partner Program & Real-Time Earnings
+<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-01" src="https://github.com/user-attachments/assets/175d698e-5ded-4d2c-b413-1f3a170b1b82" />
+
+
+### 3. Distributed Platform Features & Mobile Apps
+<img width="1850" height="892" alt="Screenshot from 2026-09-01 00-53-08" src="https://github.com/user-attachments/assets/f30d0281-9478-447f-8e3a-cde765217edb" />
+oad.png)
+
+<img width="1854" height="887" alt="Screenshot from 2026-09-02 13-10-36" src="https://github.com/user-attachments/assets/cd58d7c4-7028-49cc-9fa1-9004d203f9d0" />
+
+
+<img width="1854" height="887" alt="Screenshot from 2026-09-02 13-10-36" src="https://github.com/user-attachments/assets/7708ce08-88af-44ff-803c-49e13430e456" />
+
+
+<img width="1854" height="930" alt="Screenshot from 2026-09-02 13-10-47" src="https://github.com/user-attachments/assets/8672b5a3-790c-44fb-8cf3-2f0349d999ec" />
+
+<img width="1854" height="930" alt="Screenshot from 2026-09-02 13-10-53" src="https://github.com/user-attachments/assets/95b16b3d-77c8-4134-9470-40a56fcf6c30" />
