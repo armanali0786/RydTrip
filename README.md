@@ -2,18 +2,6 @@
 
 **Production-grade, real-time distributed ride-hailing & dispatch platform** powered by an event-driven microservices architecture, low-latency geospatial matching, atomic driver reservation under high concurrency, and a fintech-grade responsive frontend UI.
 
----
-
-
-
-
-
-
-
-
-
----
-
 ## 🏗️ System Design & Architecture
 
 RydTrip is designed as a distributed, decoupled event-driven system built with Node.js/NestJS microservices communicating over **Apache Kafka**, **Redis GEO**, and **PostgreSQL/PostGIS**.
