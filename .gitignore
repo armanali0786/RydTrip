@@ -21,3 +21,7 @@ kubeconfig
 
 # Prisma generated clients (service-local, regenerated via `prisma generate`)
 services/*/prisma-client/
+
+docs/
+CHANGELOG.md
+CLAUDE.md
