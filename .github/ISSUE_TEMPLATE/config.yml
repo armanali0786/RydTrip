@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/armanali0786/RydTrip/security/advisories/new
+    about: Do not open a public issue for security reports — see SECURITY.md and use a private advisory instead.
+  - name: Questions / discussion
+    url: https://github.com/armanali0786/RydTrip/discussions
+    about: General questions about the architecture or roadmap that aren't a bug or a scoped task.

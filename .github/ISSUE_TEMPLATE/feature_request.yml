@@ -1,0 +1,30 @@
+name: Feature / improvement proposal
+description: Propose something not already scoped in a phase (a doc gap, tooling improvement, refactor).
+title: "[proposal]: "
+labels: ["enhancement", "needs-discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For work already scoped in [PHASES.md](../../docs/roadmap/PHASES.md), use the
+        "Phase task" template instead. This template is for things outside the
+        roadmap — reserve it for real gaps, not "sounds cool" additions (see
+        CONTRIBUTING.md's "no feature for resume-appeal" rule).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

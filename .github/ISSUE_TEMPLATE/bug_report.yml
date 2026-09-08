@@ -1,0 +1,59 @@
+name: Bug report
+description: Something in a running service, test, or workflow doesn't work as documented.
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: check [PHASES.md](../../docs/roadmap/PHASES.md) — if the area
+        you hit is in a phase still marked ⚪ not started, it's not a bug, it's future
+        work (open a task instead, see the "Phase task" template).
+  - type: input
+    id: service
+    attributes:
+      label: Affected service/package
+      description: e.g. dispatch-service, api-gateway, libraries/redis-client, apps/rider-web
+      placeholder: services/dispatch-service
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Actual behavior, including error messages/log lines.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands run, e.g. `docker compose up`, then `curl ...`.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, OS, `docker compose` vs local `kind` cluster, etc.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and this isn't a duplicate
+          required: true
+        - label: I did not include any real personal data (names, phone numbers, tokens) in logs pasted above
+          required: true

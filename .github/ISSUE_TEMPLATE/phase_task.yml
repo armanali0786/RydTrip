@@ -1,0 +1,42 @@
+name: Phase task / exit criterion
+description: A deliverable or exit criterion from docs/roadmap/PHASES.md that's ready to be picked up.
+title: "[phase-N]: "
+labels: ["phase-task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for work that's already scoped in
+        [PHASES.md](../../docs/roadmap/PHASES.md) — a deliverable or exit criterion
+        for the current 🟡 in-progress phase, or a follow-up the phase doc calls out
+        as deferred.
+  - type: input
+    id: phase
+    attributes:
+      label: Phase number and name
+      placeholder: "Phase 13 — Terraform + AWS"
+    validations:
+      required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Deliverable or exit criterion
+      description: Copy the exact bullet/checkbox from PHASES.md this issue covers.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / constraints
+      description: Anything from the phase doc's "Design notes" or dependencies on earlier phases.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: The phase this depends on is marked 🟢 Done in PHASES.md
+          required: true
+        - label: This isn't already covered by an open issue or PR
+          required: true
