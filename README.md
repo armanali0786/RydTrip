@@ -78,6 +78,10 @@ sequenceDiagram
     GW->>Svc: forward if authorized, else 401/403
 ```
 
+<img width="5240" height="2808" alt="rydtrip-demo" src="https://github.com/user-attachments/assets/50b4a38e-4cdf-4dbf-8123-20217fcdd47b" />
+
+[rydtrip-architecture-video.webm](https://github.com/user-attachments/assets/28427d0c-e9d2-4867-9f9b-f8d82ca538cb)
+
 
 ### End-to-End Dispatch Flow
 1. **Booking Request**: Rider submits pickup and dropoff points via the **HeroRideForm** on the web app.
